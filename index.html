@@ -1,786 +1,147 @@
 <!DOCTYPE html>
-<html lang="fr" class="h-full">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adaptateur Document ARU - Accessibilité Pédagogique</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- docx.js pour l'export Word -->
-    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
-    <!-- FileSaver.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <!-- html2pdf.js pour l'export PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        aruBlue: '#1e40af',
-                        aruYellow: '#fef08a',
-                        aruDark: '#0f172a'
-                    },
-                    fontFamily: {
-                        sans: ['Arial', 'Helvetica', 'sans-serif'],
-                        opendyslexic: ['OpenDyslexic', 'Arial', 'sans-serif']
-                    }
-                }
-            }
-        }
-    </script>
-    
-    <style>
-        @font-face {
-            font-family: 'OpenDyslexic';
-            src: url('https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/fonts/OpenDyslexic-Regular.otf') format('opentype');
-            font-weight: normal;
-            font-style: normal;
-        }
-
-        /* Style strict pour la zone éditable ARU */
-        .aru-preview-area {
-            font-family: Arial, sans-serif;
-            font-size: 14pt;
-            line-height: 1.5;
-            hyphens: none;
-            -webkit-hyphens: none;
-            word-break: keep-all;
-            overflow-wrap: break-word;
-        }
-
-        .aru-preview-area.font-dyslexic {
-            font-family: 'OpenDyslexic', Arial, sans-serif !important;
-        }
-
-        /* Espace aménagement pour les lignes trop petites */
-        .aru-response-zone {
-            display: block;
-            min-height: 4.5rem;
-            border: 2px dashed #94a3b8;
-            border-radius: 8px;
-            background-color: #f8fafc;
-            margin: 12px 0;
-            padding: 10px;
-            color: #64748b;
-        }
-
-        .dark .aru-response-zone {
-            background-color: #1e293b;
-            border-color: #475569;
-            color: #94a3b8;
-        }
-
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        .dark ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        .dark ::-webkit-scrollbar-thumb {
-            background: #334155;
-        }
-    </style>
-</head>
-<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-full flex flex-col transition-colors duration-200">
-
-    <header class="bg-blue-800 text-white shadow-md sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-                <div class="bg-amber-400 text-blue-900 p-2 rounded-lg font-bold text-xl">
-                    <i class="fa-solid font-bold fa-universal-access"></i>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold tracking-wide">Adaptateur ARU</h1>
-                    <p class="text-xs text-blue-200">Aménagements Raisonnables Universels</p>
-                </div>
-            </div>
-
-            <!-- Accessibility Quick Controls -->
-            <div class="flex items-center space-x-2 sm:space-x-4">
-                <button id="toggleDyslexicBtn" title="Basculer vers police OpenDyslexic" class="px-3 py-1.5 bg-blue-700 hover:bg-blue-600 rounded-lg text-xs sm:text-sm font-semibold transition flex items-center gap-1.5 border border-blue-500">
-                    <i class="fa-solid fa-font"></i>
-                    <span class="hidden sm:inline">Police Dys</span>
-                </button>
-                <button id="toggleDarkModeBtn" title="Mode Contraste / Sombre" class="p-2 bg-blue-700 hover:bg-blue-600 rounded-lg transition border border-blue-500 text-amber-300">
-                    <i class="fa-solid fa-moon text-lg" id="darkModeIcon"></i>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <main class="flex-grow max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col gap-6">
-
-        <!-- Stepper Navigation -->
-        <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-            <div class="flex justify-between items-center max-w-2xl mx-auto text-xs sm:text-sm">
-                <div id="stepIndicator1" class="flex items-center gap-2 font-bold text-blue-700 dark:text-blue-400">
-                    <span class="w-7 h-7 rounded-full bg-blue-700 text-white flex items-center justify-center text-xs">1</span>
-                    <span>Importer</span>
-                </div>
-                <div class="h-0.5 flex-grow mx-2 bg-slate-200 dark:bg-slate-700"></div>
-                <div id="stepIndicator2" class="flex items-center gap-2 text-slate-400">
-                    <span class="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs">2</span>
-                    <span>Adapter & Vérifier</span>
-                </div>
-                <div class="h-0.5 flex-grow mx-2 bg-slate-200 dark:bg-slate-700"></div>
-                <div id="stepIndicator3" class="flex items-center gap-2 text-slate-400">
-                    <span class="w-7 h-7 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs">3</span>
-                    <span>Exporter</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- STEP 1: IMPORTATION -->
-        <section id="step1Section" class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 class="text-lg font-bold mb-2 flex items-center gap-2 text-blue-900 dark:text-blue-300">
-                <i class="fa-solid fa-file-arrow-up"></i>
-                1. Importer un document à adapter
-            </h2>
-            <p class="text-sm text-slate-600 dark:text-slate-400 mb-6">
-                Formats acceptés : PDF, Word, Images (JPG, PNG, WEBP), Captures d'écran, Photos de documents manuscrits et formats iPhone (HEIC).
-            </p>
-
-            <div id="dropZone" class="border-3 border-dashed border-blue-300 dark:border-slate-600 rounded-xl p-8 text-center hover:border-blue-500 dark:hover:border-blue-400 transition cursor-pointer bg-blue-50/50 dark:bg-slate-800/50 flex flex-col items-center justify-center gap-4">
-                <div class="w-16 h-16 bg-blue-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center text-2xl">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                </div>
-                <div>
-                    <p class="font-bold text-slate-700 dark:text-slate-200 text-base mb-1">
-                        Glissez-déposez votre document ici
-                    </p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">
-                        ou passez par votre appareil / appareil photo
-                    </p>
-                </div>
-                <input type="file" id="fileInput" class="hidden" accept="image/*,.pdf,.doc,.docx,.heic">
-                <button type="button" onclick="document.getElementById('fileInput').click()" class="px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white font-semibold rounded-lg shadow-sm text-sm transition">
-                    <i class="fa-solid fa-folder-open mr-2"></i> Parcourir mes fichiers
-                </button>
-            </div>
-
-            <!-- Demo Samples -->
-            <div class="mt-6 pt-6 border-t border-slate-100 dark:border-slate-700">
-                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Ou tester directement avec un exemple :</p>
-                <div class="flex flex-wrap gap-3">
-                    <button onclick="loadSample('exercice')" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 transition flex items-center gap-2">
-                        <i class="fa-solid fa-file-lines text-blue-600 dark:text-blue-400"></i> Fiche d'Exercices Évaluatifs
-                    </button>
-                    <button onclick="loadSample('manuscrit')" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-xs font-medium rounded-lg text-slate-700 dark:text-slate-200 transition flex items-center gap-2">
-                        <i class="fa-solid fa-pen-nib text-amber-600 dark:text-amber-400"></i> Texte Manuscrit / Photo
-                    </button>
-                </div>
-            </div>
-        </section>
-
-        <!-- STEP 2 & 3: ADAPTATION & EDITING (Hidden by default) -->
-        <section id="step2Section" class="hidden flex-col gap-6">
-
-            <!-- Control Bar / Toolbar -->
-            <div class="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-wrap justify-between items-center gap-4">
-                <div class="flex items-center gap-2">
-                    <button id="backBtn" class="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg font-medium transition text-slate-700 dark:text-slate-200">
-                        <i class="fa-solid fa-arrow-left mr-1"></i> Changer de document
-                    </button>
-                    <span id="fileNameDisplay" class="text-xs font-semibold text-blue-700 dark:text-blue-400 truncate max-w-[200px]">document.png</span>
-                </div>
-
-                <!-- ARU Toolbar Actions -->
-                <div class="flex flex-wrap items-center gap-2">
-                    <button id="highlightKeywordsBtn" class="px-3 py-1.5 bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 hover:bg-amber-200 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-highlighter"></i> Repérer Mots-Clés
-                    </button>
-                    <button id="addResponseZoneBtn" class="px-3 py-1.5 bg-blue-50 dark:bg-blue-900/40 text-blue-900 dark:text-blue-200 border border-blue-300 dark:border-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-square-plus"></i> + Espace Réponse
-                    </button>
-                    <button id="reAnalyzeBtn" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-semibold transition flex items-center gap-1">
-                        <i class="fa-solid fa-wand-magic-sparkles text-purple-500"></i> Ré-analyser OCR
-                    </button>
-                </div>
-            </div>
-
-            <!-- Dual View Grid (Original vs Adapted) -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
-                <!-- Left: Source Document Preview -->
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col h-[650px]">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="text-sm font-bold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                            <i class="fa-solid fa-file-image text-slate-500"></i> Original / Source OCR
-                        </h3>
-                        <span class="text-[11px] bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500">Document d'origine</span>
-                    </div>
-                    <div class="flex-grow bg-slate-50 dark:bg-slate-900 rounded-lg p-2 overflow-auto flex items-center justify-center border border-slate-200 dark:border-slate-800">
-                        <img id="sourceImagePreview" src="" alt="Aperçu original" class="max-w-full max-h-full object-contain rounded shadow-sm hidden">
-                        <div id="sourceTextFallback" class="p-4 text-xs font-mono text-slate-600 dark:text-slate-400 whitespace-pre-wrap hidden overflow-auto w-full h-full"></div>
-                        <div id="sourcePlaceholder" class="text-center text-slate-400">
-                            <i class="fa-solid fa-file-contract text-4xl mb-2"></i>
-                            <p class="text-xs">Chargement du document source...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Right: Accessible ARU Interactive Editor -->
-                <div class="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-blue-200 dark:border-blue-900 flex flex-col h-[650px]">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="text-sm font-bold text-blue-800 dark:text-blue-300 flex items-center gap-2">
-                            <i class="fa-solid fa-pen-to-square text-blue-600"></i> Document Adapté ARU (Éditable)
-                        </h3>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 font-bold px-2 py-0.5 rounded">Arial 14pt - Interligne 1.5</span>
-                        </div>
-                    </div>
-
-                    <!-- Editor Content Container -->
-                    <div class="flex-grow bg-white dark:bg-slate-900 rounded-lg border-2 border-blue-200 dark:border-slate-700 p-6 overflow-auto shadow-inner">
-                        <div id="aruEditor" contenteditable="true" class="aru-preview-area outline-none min-h-full text-slate-900 dark:text-slate-100">
-                            <!-- Streamed content goes here -->
-                        </div>
-                    </div>
-                    
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-2 italic">
-                        💡 Vous pouvez cliquer directement dans le texte ci-dessus pour relire, corriger ou ajouter des indications.
-                    </p>
-                </div>
-            </div>
-
-            <!-- STEP 3: EXPORT PANEL -->
-            <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-                <h3 class="text-md font-bold mb-4 flex items-center gap-2 text-slate-800 dark:text-slate-200">
-                    <i class="fa-solid fa-file-export text-emerald-600"></i>
-                    3. Exporter le document adapté
-                </h3>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                    <!-- Word Option -->
-                    <label class="flex items-start p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition bg-slate-50/50 dark:bg-slate-900/50">
-                        <input type="checkbox" id="checkDocx" checked class="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                        <div class="ml-3">
-                            <span class="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                <i class="fa-solid fa-file-word text-blue-600"></i> Format Microsoft Word (.docx)
-                            </span>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                Conserve l'agencement ARU, police Arial 14pt, interligne 1.5 et mots-clés en gras. Idéal pour retouches ultérieures.
-                            </p>
-                        </div>
-                    </label>
-
-                    <!-- PDF Option -->
-                    <label class="flex items-start p-4 border-2 border-slate-200 dark:border-slate-700 rounded-xl cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 transition bg-slate-50/50 dark:bg-slate-900/50">
-                        <input type="checkbox" id="checkPdf" checked class="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
-                        <div class="ml-3">
-                            <span class="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                                <i class="fa-solid fa-file-pdf text-red-600"></i> Format Document PDF (.pdf)
-                            </span>
-                            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                Mise en page fixe accessible prête pour impression directe ou lecture sur tablette/smartphone.
-                            </p>
-                        </div>
-                    </label>
-                </div>
-
-                <div class="flex justify-end">
-                    <button id="downloadBtn" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2 text-sm">
-                        <i class="fa-solid fa-download"></i> Télécharger le(s) fichier(s) adapté(s)
-                    </button>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Processing Loading Overlay -->
-    <div id="loadingModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
-        <div class="bg-white dark:bg-slate-800 rounded-2xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl border border-slate-200 dark:border-slate-700">
-            <div class="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <h4 class="text-base font-bold text-slate-800 dark:text-slate-100 mb-1" id="loadingTitle">Analyse du document...</h4>
-            <p class="text-xs text-slate-500 dark:text-slate-400" id="loadingSubtitle">Transcription OCR & Adaptation aux normes ARU en cours...</p>
-        </div>
-    </div>
-
-    <!-- Notification Toast -->
-    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 translate-y-20 opacity-0 transition-all duration-300 z-50 text-xs sm:text-sm">
-        <i class="fa-solid fa-circle-check text-emerald-400 text-lg" id="toastIcon"></i>
-        <span id="toastMessage">Action effectuée avec succès</span>
-    </div>
-
-    <script>
-        // Key verbs list for auto-highlighting instructions in French pedagogy
-        const ARU_ACTION_VERBS = [
-            "Souligne", "Souligner", "Entoure", "Entourer", "Coche", "Cocher", 
-            "Calcule", "Calculer", "Compare", "Comparer", "Explique", "Expliquer", 
-            "Justifie", "Justifier", "Surligne", "Surligner", "Remplis", "Remplir", 
-            "Définis", "Définir", "Relie", "Relier", "Complète", "Compléter", 
-            "Annote", "Annoter", "Classe", "Classer", "Résous", "Résoudre",
-            "Écris", "Écrire", "Cite", "Citer", "Trouve", "Trouver"
-        ];
-
-        // Global State
-        let currentFile = null;
-        let originalContentBase64 = null;
-        let isDarkMode = false;
-        let isDyslexicFont = false;
-
-        // DOM Elements
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
-        const step1Section = document.getElementById('step1Section');
-        const step2Section = document.getElementById('step2Section');
-        const aruEditor = document.getElementById('aruEditor');
-        const sourceImagePreview = document.getElementById('sourceImagePreview');
-        const sourceTextFallback = document.getElementById('sourceTextFallback');
-        const sourcePlaceholder = document.getElementById('sourcePlaceholder');
-        const loadingModal = document.getElementById('loadingModal');
-
-        // Initial Event Listeners
-        window.addEventListener('DOMContentLoaded', () => {
-            setupDragAndDrop();
-            setupAccessibilityControls();
-        });
-
-        function showToast(msg, isError = false) {
-            const toast = document.getElementById('toast');
-            const toastMessage = document.getElementById('toastMessage');
-            const toastIcon = document.getElementById('toastIcon');
-            
-            toastMessage.textContent = msg;
-            toastIcon.className = isError 
-                ? "fa-solid fa-circle-exclamation text-rose-400 text-lg" 
-                : "fa-solid fa-circle-check text-emerald-400 text-lg";
-
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => {
-                toast.classList.add('translate-y-20', 'opacity-0');
-            }, 3500);
-        }
-
-        function setupAccessibilityControls() {
-            // Dark Mode
-            document.getElementById('toggleDarkModeBtn').addEventListener('click', () => {
-                isDarkMode = !isDarkMode;
-                if(isDarkMode) {
-                    document.documentElement.classList.add('dark');
-                    document.getElementById('darkModeIcon').className = 'fa-solid fa-sun text-lg';
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    document.getElementById('darkModeIcon').className = 'fa-solid fa-moon text-lg';
-                }
-            });
-
-            // Dyslexic Font
-            document.getElementById('toggleDyslexicBtn').addEventListener('click', () => {
-                isDyslexicFont = !isDyslexicFont;
-                if(isDyslexicFont) {
-                    aruEditor.classList.add('font-dyslexic');
-                    showToast("Police OpenDyslexic activée");
-                } else {
-                    aruEditor.classList.remove('font-dyslexic');
-                    showToast("Police Arial restaurée");
-                }
-            });
-
-            // Back Button
-            document.getElementById('backBtn').addEventListener('click', () => {
-                step2Section.classList.add('hidden');
-                step2Section.classList.remove('flex');
-                step1Section.classList.remove('hidden');
-                updateStepIndicators(1);
-            });
-
-            // ARU Helper Buttons
-            document.getElementById('highlightKeywordsBtn').addEventListener('click', highlightInstructionKeywords);
-            document.getElementById('addResponseZoneBtn').addEventListener('click', appendResponseZone);
-            document.getElementById('downloadBtn').addEventListener('click', handleExport);
-            document.getElementById('reAnalyzeBtn').addEventListener('click', () => {
-                if(originalContentBase64) processDocumentWithGemini(originalContentBase64);
-            });
-        }
-
-        function updateStepIndicators(step) {
-            const ind1 = document.getElementById('stepIndicator1');
-            const ind2 = document.getElementById('stepIndicator2');
-            const ind3 = document.getElementById('stepIndicator3');
-
-            ind1.className = step >= 1 ? "flex items-center gap-2 font-bold text-blue-700 dark:text-blue-400" : "flex items-center gap-2 text-slate-400";
-            ind2.className = step >= 2 ? "flex items-center gap-2 font-bold text-blue-700 dark:text-blue-400" : "flex items-center gap-2 text-slate-400";
-            ind3.className = step >= 3 ? "flex items-center gap-2 font-bold text-blue-700 dark:text-blue-400" : "flex items-center gap-2 text-slate-400";
-        }
-
-        function setupDragAndDrop() {
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    dropZone.classList.add('border-blue-500', 'bg-blue-100/50');
-                });
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('border-blue-500', 'bg-blue-100/50');
-                });
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                if(files.length > 0) handleFileSelect(files[0]);
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                if(e.target.files.length > 0) handleFileSelect(e.target.files[0]);
-            });
-        }
-
-        function handleFileSelect(file) {
-            currentFile = file;
-            document.getElementById('fileNameDisplay').textContent = file.name;
-            loadingModal.classList.remove('hidden');
-
-            const reader = new FileReader();
-            
-            if (file.type.startsWith('image/') || file.name.endsWith('.heic')) {
-                reader.onload = (e) => {
-                    const base64Data = e.target.result.split(',')[1];
-                    originalContentBase64 = base64Data;
-                    
-                    // Show Image Preview
-                    sourceImagePreview.src = e.target.result;
-                    sourceImagePreview.classList.remove('hidden');
-                    sourceTextFallback.classList.add('hidden');
-                    sourcePlaceholder.classList.add('hidden');
-
-                    processDocumentWithGemini(base64Data, file.type || 'image/png');
-                };
-                reader.readAsDataURL(file);
-            } else {
-                // For PDF or DOCX, read text/file fallback
-                reader.onload = (e) => {
-                    const arrayBuffer = e.target.result;
-                    // For simplicity in client preview, simulate text parsing or send to Gemini
-                    sourceImagePreview.classList.add('hidden');
-                    sourceTextFallback.classList.remove('hidden');
-                    sourceTextFallback.textContent = `[Fichier importé : ${file.name}]\nContenu prêt pour transcription OCR et mise aux normes ARU.`;
-                    sourcePlaceholder.classList.add('hidden');
-
-                    // Sample text processing for non-images
-                    processTextDocument(file.name);
-                };
-                reader.readAsArrayBuffer(file);
-            }
-        }
-
-        async function processDocumentWithGemini(base64Image, mimeType = 'image/png') {
-            const systemPrompt = `Tu es un expert en orthopédagogie et en accessibilité numérique spécialisé dans la mise en conformité ARU (Aménagements Raisonnables Universels) pour les élèves à besoins spécifiques (Dyslexie, Dysgraphie, Malvoyance, TDAH).
-Ton rôle est d'analyser l'image/document fourni (imprimé, manuscrit ou capture) et d'en extraire TOUT le texte avec une structuration parfaite au format HTML épuré.
-
-RÈGLES DE STRUCTURATION ET DE MISE EN PAGE ARU STRICTES :
-1. Hiérarchie visuelle claire :
-   - Titre principal : Utilise <h1> avec texte en GRAS.
-   - Sous-titres : Utilise <h2> avec texte en GRAS.
-2. Mots-clés des consignes : Met OBLIGATOIREMENT en GRAS (via <strong>) tous les verbes d'action pédagogiques (ex: Souligne, Entoure, Coche, Calcule, Compare, Explique, Justifie, Surligne, Remplis, Définis, Relie, Complète).
-3. Espaces de réponse (Lignes trop petites) :
-   - Détecte chaque endroit où l'élève doit répondre, compléter une phrase ou écrire.
-   - Si la ligne originale est courte ou étroite, génère systématiquement une zone agrandie au format :
-     <div class="aru-response-zone">[ Zone de réponse élargie ARU ]</div>
-4. Conserve scrupuleusement la numérotation des questions et la structure en listes (<ul>, <ol>, <li>).
-5. Ne coupe AUCUN mot en fin de ligne.
-6. Ne génère pas de style CSS inline durci. Rends du HTML propre uniquement (<p>, <h1>, <h2>, <strong>, <ul>, <li>, <div class="aru-response-zone">).`;
-
-            const userQuery = "Analyse ce document, effectue la transcription OCR exacte (y compris manuscrit), repère les verbes de consignes pour les mettre en gras, et agrandis les espaces de réponse pour les aménagements universels (ARU). Rends uniquement le code HTML résultant sans blocs markdown triple backticks.";
-
-            const apiKey = "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-preview:generateContent?key=${apiKey}`;
-
-            const payload = {
-                contents: [
-                    {
-                        role: "user",
-                        parts: [
-                            { text: userQuery },
-                            {
-                                inlineData: {
-                                    mimeType: mimeType.includes('image') ? mimeType : 'image/png',
-                                    data: base64Image
-                                }
-                            }
-                        ]
-                    }
-                ],
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }]
-                }
-            };
-
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) throw new Error("Erreur de communication avec l'IA Gemini");
-
-                const result = await response.json();
-                const candidate = result.candidates?.[0];
-                let extractedHtml = candidate?.content?.parts?.[0]?.text || "<p>Erreur lors de la lecture du document.</p>";
-
-                // Clean markdown codeblocks if present
-                extractedHtml = extractedHtml.replace(/```html/gi, '').replace(/```/g, '').trim();
-
-                aruEditor.innerHTML = extractedHtml;
-                switchToStep2();
-                showToast("Transcription & Adaptation ARU réussies !");
-
-            } catch (err) {
-                console.error("Gemini OCR Error:", err);
-                // Fallback demo content if API fails or offline
-                loadFallbackAdaptedContent();
-                switchToStep2();
-                showToast("Analyse effectuée (mode secours)", true);
-            } finally {
-                loadingModal.classList.add('hidden');
-            }
-        }
-
-        function processTextDocument(filename) {
-            setTimeout(() => {
-                loadSample('exercice');
-                loadingModal.classList.add('hidden');
-                switchToStep2();
-                showToast("Document Word/PDF importé avec succès");
-            }, 1000);
-        }
-
-        function loadSample(type) {
-            loadingModal.classList.remove('hidden');
-            document.getElementById('fileNameDisplay').textContent = type === 'exercice' ? 'Fiche_Evaluation_Histoire.png' : 'Exercice_Manuscrit_Maths.png';
-            
-            sourceImagePreview.src = type === 'exercice' 
-                ? "https://placehold.co/600x800/f8fafc/1e3a8a?text=Fiche+d'Exercices+Originale+(Consignes+Serr%C3%A9es)" 
-                : "https://placehold.co/600x800/fef3c7/78350f?text=Photo+Document+Manuscrit+(Lignes+Courtes)";
-            
-            sourceImagePreview.classList.remove('hidden');
-            sourcePlaceholder.classList.add('hidden');
-            sourceTextFallback.classList.add('hidden');
-
-            setTimeout(() => {
-                if (type === 'exercice') {
-                    aruEditor.innerHTML = `
-                        <h1 class="text-xl font-bold mb-4">Évaluation : Les Grandes Découvertes Géographiques</h1>
-                        
-                        <p class="mb-3"><strong>Consigne 1 :</strong> <strong>Relie</strong> chaque navigateur à sa découverte correspondante :</p>
-                        <ul class="list-disc ml-6 mb-4 space-y-1">
-                            <li>Christopher Colomb &mdash; Tour du monde</li>
-                            <li>Vasco de Gama &mdash; Arrivée en Amérique</li>
-                            <li>Fernand de Magellan &mdash; Route des Indes par l'Afrique</li>
-                        </ul>
-
-                        <p class="mb-2"><strong>Consigne 2 :</strong> <strong>Explique</strong> en deux phrases pourquoi la boussole a été une invention majeure pour les marins du 15ème siècle.</p>
-                        <div class="aru-response-zone">[ Espace de réponse élargi ARU ]</div>
-
-                        <p class="mb-2"><strong>Consigne 3 :</strong> <strong>Coche</strong> la bonne réponse :</p>
-                        <p class="ml-4 mb-1">🔲 La caravelle est un navire rapide et stable.</p>
-                        <p class="ml-4 mb-4">🔲 La caravelle utilisait uniquement des rames.</p>
-
-                        <p class="mb-2"><strong>Consigne 4 :</strong> <strong>Justifie</strong> l'impact du commerce des épices sur l'économie européenne.</p>
-                        <div class="aru-response-zone">[ Espace de réponse élargi ARU ]</div>
-                    `;
-                } else {
-                    aruEditor.innerHTML = `
-                        <h1 class="text-xl font-bold mb-4">Exercice de Mathématiques - Résolution de Problèmes</h1>
-                        
-                        <p class="mb-2"><strong>Problème :</strong> Un commerçant achète 15 caisses de pommes. Chaque caisse contient 24 kg de fruits.</p>
-                        
-                        <p class="mb-2"><strong>Question 1 :</strong> <strong>Calcule</strong> la masse totale de pommes achetées par le commerçant.</p>
-                        <div class="aru-response-zone">[ Espace de réponse élargi ARU ]</div>
-
-                        <p class="mb-2"><strong>Question 2 :</strong> <strong>Compare</strong> le résultat obtenu avec une commande de 350 kg. <strong>Explique</strong> si la quantité est suffisante.</p>
-                        <div class="aru-response-zone">[ Espace de réponse élargi ARU ]</div>
-                    `;
-                }
-                
-                loadingModal.classList.add('hidden');
-                switchToStep2();
-                showToast("Exemple ARU chargé avec succès");
-            }, 800);
-        }
-
-        function loadFallbackAdaptedContent() {
-            aruEditor.innerHTML = `
-                <h1 class="text-xl font-bold mb-4">Document Adapté aux Normes ARU</h1>
-                <p class="mb-3"><strong>Consigne :</strong> <strong>Lis</strong> attentivement le texte ci-dessous et <strong>réponds</strong> aux questions en utilisant l'espace prévu.</p>
-                <div class="aru-response-zone">[ Zone de réponse élargie ARU ]</div>
-            `;
-        }
-
-        function switchToStep2() {
-            step1Section.classList.add('hidden');
-            step2Section.classList.remove('hidden');
-            step2Section.classList.add('flex');
-            updateStepIndicators(2);
-        }
-
-        function highlightInstructionKeywords() {
-            let html = aruEditor.innerHTML;
-            ARU_ACTION_VERBS.forEach(verb => {
-                const regex = new RegExp(`\\b(${verb})\\b`, 'gi');
-                html = html.replace(regex, '<strong>$1</strong>');
-            });
-            aruEditor.innerHTML = html;
-            showToast("Mots-clés des consignes mis en évidence !");
-        }
-
-        function appendResponseZone() {
-            const responseDiv = document.createElement('div');
-            responseDiv.className = 'aru-response-zone';
-            responseDiv.innerText = '[ Espace de réponse élargi ARU ]';
-            aruEditor.appendChild(responseDiv);
-            showToast("Espace de réponse ajouté !");
-        }
-
-        async function handleExport() {
-            const doDocx = document.getElementById('checkDocx').checked;
-            const doPdf = document.getElementById('checkPdf').checked;
-
-            if (!doDocx && !doPdf) {
-                showToast("Veuillez cocher au moins un format d'export (.docx ou .pdf)", true);
-                return;
-            }
-
-            loadingModal.classList.remove('hidden');
-            document.getElementById('loadingTitle').textContent = "Génération des fichiers...";
-            document.getElementById('loadingSubtitle').textContent = "Création des documents sous la norme ARU (Arial 14, interligne 1.5)";
-
-            try {
-                if (doDocx) await exportToDocx();
-                if (doPdf) await exportToPdf();
-                
-                updateStepIndicators(3);
-                showToast("Exportation terminée !");
-            } catch (err) {
-                console.error("Export error:", err);
-                showToast("Erreur lors de l'exportation des fichiers", true);
-            } finally {
-                loadingModal.classList.add('hidden');
-                document.getElementById('loadingTitle').textContent = "Analyse du document...";
-            }
-        }
-
-        // Export DOCX avec docx.js en respectant Arial 14pt et Interligne 1.5
-        async function exportToDocx() {
-            const { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle } = window.docx;
-
-            // Extraire les éléments HTML pour construction du DOCX
-            const elements = aruEditor.children;
-            const docChildren = [];
-
-            if (elements.length === 0) {
-                docChildren.push(new Paragraph({
-                    children: [new TextRun({ text: aruEditor.innerText, font: "Arial", size: 28 })],
-                    lineSpacing: { line: 360 } // Interligne 1.5 (240 * 1.5)
-                }));
-            } else {
-                for (let el of elements) {
-                    const textContent = el.innerText.trim();
-                    if (!textContent && !el.classList.contains('aru-response-zone')) continue;
-
-                    if (el.tagName === 'H1' || el.tagName === 'H2') {
-                        docChildren.push(new Paragraph({
-                            children: [
-                                new TextRun({
-                                    text: textContent,
-                                    bold: true,
-                                    font: "Arial",
-                                    size: el.tagName === 'H1' ? 36 : 32 // 18pt ou 16pt
-                                })
-                            ],
-                            spacing: { before: 240, after: 120 },
-                            lineSpacing: { line: 360 }
-                        }));
-                    } else if (el.classList.contains('aru-response-zone')) {
-                        // Zone de réponse agrandie
-                        docChildren.push(new Paragraph({
-                            children: [new TextRun({ text: "", font: "Arial", size: 28 })],
-                            spacing: { before: 200, after: 200 },
-                            border: {
-                                top: { style: BorderStyle.DASHED, size: 6, color: "94A3B8" },
-                                bottom: { style: BorderStyle.DASHED, size: 6, color: "94A3B8" },
-                                left: { style: BorderStyle.DASHED, size: 6, color: "94A3B8" },
-                                right: { style: BorderStyle.DASHED, size: 6, color: "94A3B8" }
-                            }
-                        }));
-                        // Ajouter des retours à la ligne pour l'espace de frappe / manuscrit
-                        for(let i=0; i<3; i++) {
-                            docChildren.push(new Paragraph({
-                                children: [new TextRun({ text: " ", font: "Arial", size: 28 })],
-                                lineSpacing: { line: 360 }
-                            }));
-                        }
-                    } else {
-                        // Paragraphes réguliers
-                        docChildren.push(new Paragraph({
-                            children: [
-                                new TextRun({
-                                    text: textContent,
-                                    font: "Arial",
-                                    size: 28 // 14pt (Half-points = 28)
-                                })
-                            ],
-                            spacing: { after: 120 },
-                            lineSpacing: { line: 360 } // Interligne 1.5
-                        }));
-                    }
-                }
-            }
-
-            const doc = new Document({
-                sections: [{
-                    properties: {},
-                    children: docChildren
-                }]
-            });
-
-            const blob = await Packer.toBlob(doc);
-            saveAs(blob, `Document_Adapté_ARU.docx`);
-        }
-
-        // Export PDF avec html2pdf.js
-        function exportToPdf() {
-            return new Promise((resolve) => {
-                const element = document.createElement('div');
-                element.className = 'p-8 aru-preview-area bg-white text-black';
-                element.style.fontFamily = 'Arial, sans-serif';
-                element.style.fontSize = '14pt';
-                element.style.lineHeight = '1.5';
-                element.innerHTML = aruEditor.innerHTML;
-
-                const opt = {
-                    margin:       15,
-                    filename:     'Document_Adapte_ARU.pdf',
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { scale: 2, useCORS: true },
-                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                };
-
-                html2pdf().set(opt).from(element).save().then(() => {
-                    resolve();
-                });
-            });
-        }
-    </script>
-</body>
-</html>
+<html lang="fr"><head><meta charset="utf-8"><title>Adaptateur ARU</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mut:#5b6572;--ac:#1f5fbf;--bd:#d5dae1}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181c;--card:#1f2328;--tx:#e8ebef;--mut:#9aa4b0;--ac:#6ea4ff;--bd:#38404a}}
+:root[data-theme="dark"]{--bg:#15181c;--card:#1f2328;--tx:#e8ebef;--mut:#9aa4b0;--ac:#6ea4ff;--bd:#38404a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,Arial,sans-serif}
+main{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin:12px 0}
+.drop{border:2px dashed var(--bd);border-radius:12px;padding:24px;text-align:center;cursor:pointer;color:var(--mut)}
+.drop:focus,.drop.on{border-color:var(--ac)}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--ac);background:var(--ac);color:#fff;cursor:pointer}
+button.sec{background:transparent;color:var(--ac)}button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+label{display:inline-flex;gap:6px;align-items:center}
+#files{color:var(--mut);font-size:14px;margin-top:8px}
+#st{color:var(--mut);min-height:1.5em}
+#ed{background:#fff;color:#000;border:1px solid var(--bd);border-radius:8px;padding:20px;min-height:200px;font:14pt/1.5 Arial,Helvetica,sans-serif;overflow-x:auto;word-break:normal;overflow-wrap:normal;hyphens:none}
+#ed h1,#ed h2{font:bold 14pt/1.5 Arial,Helvetica,sans-serif;margin:.8em 0 .2em}
+#ed p{margin:0 0 .6em}
+.ans{margin:0 0 .8em;user-select:none}.ans i{display:block;height:2.1em;border-bottom:1px solid #777}
+#ed table{border-collapse:collapse;width:100%;table-layout:fixed;margin:0 0 .8em}#ed td{border:1px solid #444;padding:4px 6px;vertical-align:top;overflow-wrap:break-word}.fig{margin:0 0 .8em;text-align:center;user-select:none}.fig img{max-width:100%;height:auto}
+</style></head><body><main>
+<h1>Adaptateur ARU</h1>
+<p style="color:var(--mut);margin:0">Word, PDF, image, capture, photo (HEIC) ou manuscrit → texte modifiable en Arial 14, interligne 1,5, avec espaces de réponse.</p>
+<div class="card">
+<div class="drop" id="drop" tabindex="0" role="button">Déposez vos fichiers ici ou cliquez pour choisir<br><small>.docx · .pdf · .jpg/.png/.webp · .heic · photos de manuscrits</small></div>
+<input id="inp" type="file" multiple hidden accept=".docx,.pdf,.heic,.heif,image/*">
+<div id="files"></div>
+<div class="row" style="margin-top:10px"><button id="go" disabled>Adapter le document</button><span id="st"></span></div>
+</div>
+<div class="card">
+<div class="row" style="justify-content:space-between"><strong>Texte adapté (modifiable)</strong>
+<span class="row"><button class="sec" id="addans">+ Zone de réponse</button><small style="color:var(--mut)">Double-clic sur une zone ou une image pour la supprimer</small></span></div>
+<div id="ed" contenteditable="true" spellcheck="true" lang="fr" style="margin-top:10px"></div>
+</div>
+<div class="card row"><strong>Exporter en :</strong>
+<label><input type="checkbox" id="xd" checked> Word (.docx)</label>
+<label><input type="checkbox" id="xp"> PDF</label>
+<button id="exp">Exporter</button><span id="st2" style="color:var(--mut)"></span></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
+<script>
+const $=s=>document.querySelector(s);let files=[];
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const drop=$('#drop'),inp=$('#inp');
+drop.onclick=()=>inp.click();drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')inp.click()};
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('on')};drop.ondragleave=()=>drop.classList.remove('on');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('on');add(e.dataTransfer.files)};
+inp.onchange=()=>{add(inp.files);inp.value=''};
+function add(l){files.push(...l);$('#files').textContent=files.map(f=>f.name).join(' · ');$('#go').disabled=!files.length}
+const ext=f=>(f.name.split('.').pop()||'').toLowerCase();
+/* Hors de Claude : définir window.ARU_ANALYSE = async (prompt, item) => ({blocks:[...]}) qui appelle votre propre API de vision ; item = {img:Blob} ou {text,imgs}. */
+const b2u=b=>new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)});
+const d2b=u=>{const[h,b]=u.split(',');return new Blob([Uint8Array.from(atob(b),c=>c.charCodeAt(0))],{type:h.match(/:(.*?);/)[1]})};
+async function toJpeg(blob){const u=URL.createObjectURL(blob);const im=new Image();im.src=u;await im.decode();
+ const k=Math.min(1,1800/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;
+ const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);
+ return new Promise(r=>c.toBlob(r,'image/jpeg',.88))}
+async function items(f){const e=ext(f);
+ if(e==='heic'||e==='heif'||/hei[cf]/.test(f.type)){let b=await heic2any({blob:f,toType:'image/jpeg',quality:.9});return[{img:await toJpeg(Array.isArray(b)?b[0]:b)}]}
+ if(f.type.startsWith('image/'))return[{img:await toJpeg(f)}];
+ if(e==='pdf'){pdfjsLib.GlobalWorkerOptions.workerSrc='x';const d=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;const o=[];
+  for(let i=1;i<=Math.min(d.numPages,15);i++){const p=await d.getPage(i);const v=p.getViewport({scale:1.8});const c=document.createElement('canvas');c.width=v.width;c.height=v.height;
+   await p.render({canvasContext:c.getContext('2d'),viewport:v}).promise;o.push({img:await new Promise(r=>c.toBlob(r,'image/jpeg',.88))})}return o}
+ if(e==='docx'){const raw=[];const r=await mammoth.convertToHtml({arrayBuffer:await f.arrayBuffer()},{convertImage:mammoth.images.imgElement(async i=>{raw.push('data:'+i.contentType+';base64,'+await i.read('base64'));return{src:'IMG'+(raw.length-1)}})});
+  const imgs=[];for(const u of raw){try{imgs.push(await b2u(await toJpeg(d2b(u))))}catch(_){imgs.push(null)}}
+  return[{text:r.value,imgs}]}
+ throw new Error('Format non pris en charge : '+f.name)}
+const PROMPT=`Tu prépares un document scolaire pour des élèves à besoins spécifiques (ARU). Retranscris FIDÈLEMENT le contenu fourni (image, manuscrit ou HTML), en français, sans reformuler, sans corriger le sens, sans couper ni changer les mots, dans l'ordre de lecture.
+Réponds UNIQUEMENT par du JSON : {"blocks":[{"t":"h1|h2|p|ans|tbl|img","x":"texte","n":3}]}
+- h1 = titre, h2 = sous-titre/intitulé de section, p = paragraphe, consigne ou question (garde la numérotation d'origine, ex. "1." ou "a)").
+- Dans "x", entoure de ** les MOTS-CLÉS des consignes (verbes d'action comme Relie, Souligne, Complète, Justifie, Entoure, Calcule, ainsi que les mots décisifs comme "deux", "uniquement", "pas").
+- Ajoute après une question/consigne un bloc {"t":"ans","n":N} quand une réponse est attendue (lignes à compléter, cadre vide, trou à remplir) : N = nombre de lignes de 1 à 8 selon la place d'origine ou la longueur probable de la réponse.
+- Tableau : {"t":"tbl","rows":[["cellule","cellule"],["…","…"]]}, fidèle à la structure d'origine (cellule vide = "", cellule à compléter par l'élève = ""), mots-clés en **gras** possibles dans les cellules.
+- Image, figure, schéma, dessin, photo (pas le texte) : {"t":"img","box":[x0,y0,x1,y1]} = cadre en fractions de 0 à 1 de l'image fournie (x0,y0 = coin haut-gauche), placé à sa position dans l'ordre de lecture. Si le contenu est du HTML avec <img src="IMGn">, utilise {"t":"img","ref":n}.
+- Ignore numéros de page et décorations. Pas de markdown autre que **gras**.`;
+async function crop(blob,bx){const u=URL.createObjectURL(blob);const im=new Image();im.src=u;await im.decode();const[x0,y0,x1,y1]=bx.map(v=>Math.max(0,Math.min(1,+v)));const w=(x1-x0)*im.width,h=(y1-y0)*im.height;if(!(w>30&&h>30))throw 0;const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,x0*im.width,y0*im.height,w,h,0,0,w,h);URL.revokeObjectURL(u);return c.toDataURL('image/jpeg',.9)}
+const inl=s=>esc(String(s||'')).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+async function render(bl,it){const ed=$('#ed');for(const b of bl){let h='';
+ if(b.t==='ans'){h=`<div class="ans" contenteditable="false" data-n="${Math.max(1,Math.min(10,+b.n||2))}">${'<i></i>'.repeat(Math.max(1,Math.min(10,+b.n||2)))}</div>`}
+ else if(b.t==='tbl'&&Array.isArray(b.rows)){h='<table>'+b.rows.map(r=>'<tr>'+(Array.isArray(r)?r:[r]).map(c=>`<td>${inl(c)}</td>`).join('')+'</tr>').join('')+'</table>'}
+ else if(b.t==='img'){try{const u=b.ref!=null?it.imgs[+b.ref]:await crop(it.img,b.box);if(u)h=`<div class="fig" contenteditable="false"><img src="${u}" alt=""></div>`}catch(_){}}
+ else{const tag=b.t==='h1'?'h1':b.t==='h2'?'h2':'p';h=`<${tag}>${inl(b.x)}</${tag}>`}
+ if(h)ed.insertAdjacentHTML('beforeend',h)}}
+$('#go').onclick=async()=>{const st=$('#st'),go=$('#go');go.disabled=true;$('#ed').innerHTML='';
+ try{const sample=window.claude?await claude.use('sample'):null;if(!sample&&!window.ARU_ANALYSE)throw new Error("Analyse indisponible : hors de Claude, définissez window.ARU_ANALYSE (voir le commentaire du script).");
+  if(sample){const lim=await sample.limits();if(!lim.images)throw new Error("L'analyse d'images n'est pas disponible pour votre compte.")}
+  let n=0;for(const f of files){st.textContent='Préparation de '+f.name+'…';const its=await items(f);
+   for(const it of its){n++;st.textContent=`Analyse ${n}…`;
+    const inpt=it.text?[{role:'user',content:PROMPT+'\n\nContenu HTML :\n'+it.text}]:[{role:'user',content:PROMPT}];
+    const r=sample?await sample.json(inpt,it.img?{images:[it.img],cache:false}:{cache:false}):await window.ARU_ANALYSE(inpt[0].content,it);await render((r&&r.blocks)||[],it)}}
+  st.textContent='Terminé. Relisez et corrigez le texte avant l’export.'}
+ catch(e){st.textContent='Erreur : '+(e.message||e.code||e)}
+ go.disabled=false};
+$('#ed').addEventListener('dblclick',e=>{const a=e.target.closest('.ans,.fig');if(a)a.remove()});
+$('#addans').onclick=()=>{const ed=$('#ed');const s=getSelection();let n=s.rangeCount?s.anchorNode:null;while(n&&n.parentNode!==ed)n=n.parentNode;
+ const d=document.createElement('div');d.className='ans';d.contentEditable='false';d.dataset.n=3;d.innerHTML='<i></i><i></i><i></i>';n?n.after(d):ed.append(d)};
+function runsOf(el,bold){const runs=[];(function w(n,b){for(const c of n.childNodes){if(c.nodeType===3){if(c.textContent)runs.push({t:c.textContent.replace(/\s+/g,' '),b})}else if(c.nodeType===1){if(c.tagName==='BR')runs.push({t:' ',b});else w(c,b||/^(B|STRONG)$/.test(c.tagName)||/^(bold|[6-9]00)$/.test(c.style.fontWeight))}}})(el,bold);return runs}
+function model(){const o=[];for(const el of $('#ed').children){
+ if(el.classList.contains('ans')){o.push({k:'a',n:+el.dataset.n||2});continue}
+ if(el.classList.contains('fig')){const im=el.querySelector('img');if(im&&im.naturalWidth)o.push({k:'i',u:im.src,w:im.naturalWidth,h:im.naturalHeight});continue}
+ if(el.tagName==='TABLE'){o.push({k:'t',rows:[...el.rows].map(r=>[...r.cells].map(c=>runsOf(c,false)))});continue}
+ const k=el.tagName==='H1'||el.tagName==='H2'?'h':'p';const runs=runsOf(el,k==='h');
+ if(runs.some(r=>r.t.trim()))o.push({k,runs})}return o}
+async function mkDocx(m){const D=docx;const P=[];const f='Arial';
+ for(const b of m){if(b.k==='t'){const nc=Math.max(...b.rows.map(r=>r.length)),cw=Math.floor(9638/nc),bd={style:D.BorderStyle.SINGLE,size:6,color:'444444'},B={top:bd,bottom:bd,left:bd,right:bd};
+  P.push(new D.Table({width:{size:cw*nc,type:D.WidthType.DXA},columnWidths:Array(nc).fill(cw),rows:b.rows.map(r=>new D.TableRow({cantSplit:true,children:Array.from({length:nc},(_,i)=>new D.TableCell({width:{size:cw,type:D.WidthType.DXA},borders:B,margins:{top:60,bottom:60,left:100,right:100},children:[new D.Paragraph({keepLines:true,spacing:{line:360},children:(r[i]||[]).map(x=>new D.TextRun({text:x.t,bold:x.b,font:f,size:28}))})]}))}))}));P.push(new D.Paragraph({children:[]}));continue}
+ if(b.k==='i'){const s=Math.min(1,560/b.w,480/b.h);P.push(new D.Paragraph({keepLines:true,spacing:{after:160},children:[new D.ImageRun({data:Uint8Array.from(atob(b.u.split(',')[1]),c=>c.charCodeAt(0)),type:'jpg',transformation:{width:Math.round(b.w*s),height:Math.round(b.h*s)}})]}));continue}
+ if(b.k==='a'){for(let i=0;i<b.n;i++)P.push(new D.Paragraph({spacing:{line:480},border:{bottom:{style:D.BorderStyle.SINGLE,size:6,color:'808080',space:1}},children:[new D.TextRun({text:'',font:f,size:28})]}));P.push(new D.Paragraph({children:[]}))}
+ else P.push(new D.Paragraph({keepLines:true,keepNext:b.k==='h',spacing:{line:360,before:b.k==='h'?240:0,after:160},children:b.runs.map(r=>new D.TextRun({text:r.t,bold:r.b,font:f,size:28}))}))}
+ const d=new D.Document({styles:{default:{document:{run:{font:f,size:28},paragraph:{spacing:{line:360}}}}},sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1134,bottom:1134,left:1134,right:1134}}},children:P}]});
+ return D.Packer.toBlob(d)}
+function mkPdf(m){const doc=new jspdf.jsPDF({unit:'pt',format:'a4'});const W=595.28,H=841.89,M=56,LH=21,maxX=W-M;let y=M;doc.setFontSize(14);
+ const nl=n=>{if(y+n>H-M){doc.addPage();y=M}};
+ const lay=(runs,W)=>{const L=[[]];let x=0;for(const q of runs)for(const w of q.t.split(/(\s+)/)){if(!w)continue;doc.setFont('helvetica',q.b?'bold':'normal');const t=doc.getTextWidth(w);if(/^\s+$/.test(w)){if(x)x+=t;continue}if(x+t>W&&x){L.push([]);x=0}L[L.length-1].push({w,b:q.b,x});x+=t}return L};
+ for(const b of m){if(b.k==='i'){const s=Math.min(1,(maxX-M)/b.w,400/b.h),w=b.w*s,h=b.h*s;nl(h+8);doc.addImage(b.u,'JPEG',M,y,w,h);y+=h+12;continue}
+  if(b.k==='t'){const nc=Math.max(...b.rows.map(r=>r.length)),cw=(maxX-M)/nc,pd=5;doc.setDrawColor(70);
+   for(const r of b.rows){const cl=Array.from({length:nc},(_,i)=>lay(r[i]||[],cw-2*pd));const h=Math.max(1,...cl.map(l=>l.length))*LH+2*pd;nl(h);
+    cl.forEach((L,i)=>{const x0=M+i*cw;doc.rect(x0,y,cw,h);L.forEach((ln,j)=>ln.forEach(t=>{doc.setFont('helvetica',t.b?'bold':'normal');doc.text(t.w,x0+pd+t.x,y+pd+(j+1)*LH-6)}))});y+=h}
+   y+=LH*.6;continue}
+  if(b.k==='a'){nl(LH*1.6*b.n);for(let i=0;i<b.n;i++){y+=LH*1.6;doc.setDrawColor(120);doc.line(M,y,maxX,y)}y+=LH*.6;continue}
+  if(b.k==='h')nl(LH*3);y+=b.k==='h'?8:0;
+  const words=[];for(const r of b.runs)for(const w of r.t.split(/(\s+)/))if(w)words.push({w,b:r.b});
+  let x=M;y+=LH;nl(0);const wd=t=>{doc.setFont('helvetica',t.b?'bold':'normal');return doc.getTextWidth(t.w)};
+  for(const t of words){const sp=/^\s+$/.test(t.w);const w=wd(t);
+   if(sp){if(x>M)x+=w;continue}
+   if(x+w>maxX&&x>M){x=M;y+=LH;if(y>H-M){doc.addPage();y=M+LH}}
+   doc.setFont('helvetica',t.b?'bold':'normal');doc.text(t.w,x,y);x+=w}
+  y+=b.k==='h'?4:LH*.4}
+ return doc.output('blob')}
+$('#exp').onclick=async()=>{const st=$('#st2');const m=model();
+ if(!m.length){st.textContent='Rien à exporter.';return}
+ if(!$('#xd').checked&&!$('#xp').checked){st.textContent='Cochez au moins un format.';return}
+ try{const dl=window.claude?await claude.use('downloads'):null;const save=(n,b)=>dl?dl.save({filename:n,data:b}):Object.assign(document.createElement('a'),{href:URL.createObjectURL(b),download:n}).click();
+  if($('#xd').checked)await save('document-ARU.docx',await mkDocx(m));
+  if($('#xp').checked)await save('document-ARU.pdf',mkPdf(m));
+  st.textContent='Export demandé.'}catch(e){st.textContent='Erreur : '+(e.message||e.code||e)}};
+</script></body></html>
