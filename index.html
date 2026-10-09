@@ -32,8 +32,6 @@
     <!-- Libraries JS pour l'exportation et le traitement des fichiers -->
     <!-- Utilisation du bundle UMD de docx.js pour éviter 'SyntaxError: Unexpected token export' dans le navigateur -->
     <script src="https://cdn.jsdelivr.net/npm/docx@8.2.2/build/index.umd.js"></script>
-    <!-- html2pdf.js pour l'export PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- mammoth.js pour lire les fichiers Word importés -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <!-- pdf.js pour la conversion des PDF clients en images -->
@@ -379,32 +377,20 @@
             <div class="bg-slate-50 p-6 border-t border-slate-200 space-y-4">
                 <div class="flex items-center justify-between flex-wrap gap-4">
                     <div>
-                        <h4 class="text-sm font-bold text-slate-800">Step 3 : Choisissez votre format d'exportation</h4>
-                        <p class="text-xs text-slate-500">Sélectionnez les formats souhaités pour télécharger votre document adapté.</p>
-                    </div>
-
-                    <!-- Cases à cocher pour sélection d'export -->
-                    <div class="flex items-center gap-6">
-                        <label class="flex items-center space-x-2 cursor-pointer font-medium text-sm text-slate-700">
-                            <input type="checkbox" id="chkExportDocx" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-5 h-5">
-                            <span><i class="fa-solid fa-file-word text-blue-600"></i> Format Word (.docx)</span>
-                        </label>
-                        <label class="flex items-center space-x-2 cursor-pointer font-medium text-sm text-slate-700">
-                            <input type="checkbox" id="chkExportPdf" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-5 h-5">
-                            <span><i class="fa-solid fa-file-pdf text-red-600"></i> Format PDF (.pdf)</span>
-                        </label>
+                        <h4 class="text-sm font-bold text-slate-800">Step 3 : Exportation & Impression</h4>
+                        <p class="text-xs text-slate-500">Téléchargez votre document adapté au format Word (.docx) ou imprimez-le directement.</p>
                     </div>
                 </div>
 
-                <div class="pt-2 flex justify-end gap-3">
+                <div class="pt-2 flex justify-end gap-3 flex-wrap">
                     <button onclick="clearEditor()" class="px-4 py-2 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition">
                         <i class="fa-solid fa-trash"></i> Effacer tout
                     </button>
-                    <button onclick="printNativePdf()" class="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-800 text-white font-medium rounded-lg transition flex items-center gap-1.5" title="Ouvrir la boîte d'impression native du navigateur">
-                        <i class="fa-solid fa-print"></i> Imprimer / PDF Natif
+                    <button onclick="printNativePdf()" class="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-800 text-white font-medium rounded-lg transition flex items-center gap-1.5" title="Ouvrir le menu d'impression du navigateur">
+                        <i class="fa-solid fa-print"></i> Imprimer le document
                     </button>
-                    <button onclick="exportSelectedFormats()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2 text-sm">
-                        <i class="fa-solid fa-download"></i> Télécharger les fichiers adaptés
+                    <button onclick="exportDocxAction()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-file-word text-lg"></i> Télécharger au format Word (.docx)
                     </button>
                 </div>
             </div>
@@ -924,23 +910,13 @@
             showToast("L'éditeur a été réinitialisé.", "info");
         }
 
-        function exportSelectedFormats() {
+        function exportDocxAction() {
             const htmlContent = aruEditor.innerHTML;
             if (!htmlContent || htmlContent.includes("Le document transformé apparaîtra ici")) {
                 showToast("Aucun contenu à exporter. Veuillez d'abord transformer un document.", "warning");
                 return;
             }
-
-            const exportDocx = document.getElementById('chkExportDocx').checked;
-            const exportPdf = document.getElementById('chkExportPdf').checked;
-
-            if (!exportDocx && !exportPdf) {
-                showToast("Veuillez cocher au moins un format d'exportation (Word ou PDF).", "warning");
-                return;
-            }
-
-            if (exportDocx) exportToDocx(htmlContent);
-            if (exportPdf) exportToPdf();
+            exportToDocx(htmlContent);
         }
 
         // Export DOCX via docx.js (avec fallback Word HTML)
@@ -1046,73 +1022,7 @@
             showToast("Fichier Word généré en mode secours HTML.", "info");
         }
 
-        // Export PDF via html2pdf.js avec fallback natif
-        async function exportToPdf() {
-            const htmlContent = aruEditor.innerHTML;
-            if (!htmlContent || htmlContent.includes("Le document transformé apparaîtra ici")) {
-                showToast("Aucun contenu à exporter en PDF.", "warning");
-                return;
-            }
-
-            showToast("Génération du fichier PDF en cours...", "info");
-
-            try {
-                // Création d'un élément temporaire positionné en fixed (rendu DOM valide pour html2canvas)
-                const printWrapper = document.createElement('div');
-                printWrapper.id = 'pdf-export-temp-wrapper';
-                printWrapper.style.position = 'fixed';
-                printWrapper.style.top = '0';
-                printWrapper.style.left = '0';
-                printWrapper.style.width = '794px'; // Format A4 standard à 96 DPI
-                printWrapper.style.zIndex = '-9999';
-                printWrapper.style.opacity = '0.99';
-                printWrapper.style.backgroundColor = '#ffffff';
-                printWrapper.style.padding = '30px';
-                printWrapper.style.boxSizing = 'border-box';
-                printWrapper.className = 'aru-content';
-                printWrapper.innerHTML = htmlContent;
-
-                document.body.appendChild(printWrapper);
-
-                const opt = {
-                    margin:       [12, 12, 12, 12],
-                    filename:     'Document_Adapte_ARU.pdf',
-                    image:        { type: 'jpeg', quality: 0.98 },
-                    html2canvas:  { 
-                        scale: 2, 
-                        useCORS: true, 
-                        logging: false,
-                        scrollX: 0,
-                        scrollY: 0,
-                        windowWidth: 800
-                    },
-                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-                };
-
-                if (typeof html2pdf !== 'undefined') {
-                    await html2pdf().set(opt).from(printWrapper).save();
-                    if (document.body.contains(printWrapper)) {
-                        document.body.removeChild(printWrapper);
-                    }
-                    showToast("Fichier PDF généré et téléchargé avec succès !", "success");
-                } else {
-                    throw new Error("Bibliothèque html2pdf introuvable.");
-                }
-
-            } catch (err) {
-                console.warn("Échec html2pdf, bascule vers l'impression native :", err);
-                const temp = document.getElementById('pdf-export-temp-wrapper');
-                if (temp) temp.remove();
-
-                showToast("Ouverture de la fenêtre d'impression (sélectionnez 'Enregistrer au format PDF')...", "info");
-                setTimeout(() => {
-                    printNativePdf();
-                }, 400);
-            }
-        }
-
-        // Fonction d'impression native permettant d'enregistrer directement en PDF
+        // Fonction d'impression native permettant d'imprimer directement
         function printNativePdf() {
             window.print();
         }
