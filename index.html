@@ -17,30 +17,31 @@ button.sec{background:transparent;color:var(--ac)}button:disabled{opacity:.5;cur
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 label{display:inline-flex;gap:6px;align-items:center}
 #files{color:var(--mut);font-size:14px;margin-top:8px}
-#st{color:var(--mut);min-height:1.5em}
-#ed{background:#fff;color:#000;border:1px solid var(--bd);border-radius:8px;padding:20px;min-height:200px;font:14pt/1.5 Arial,Helvetica,sans-serif;overflow-x:auto;word-break:normal;overflow-wrap:normal;hyphens:none}
+#st,#st2{color:var(--mut);min-height:1.5em}
+#st[role="status"],#st2[role="status"]{display:inline-block}
+#ed{background:#fff;color:#000;border:1px solid var(--bd);border-radius:8px;padding:20px;min-height:200px;font:14pt/1.5 Arial,Helvetica,sans-serif;overflow-x:auto;word-break:normal;overflow-wrap:normal}
 #ed h1,#ed h2{font:bold 14pt/1.5 Arial,Helvetica,sans-serif;margin:.8em 0 .2em}
 #ed p{margin:0 0 .6em}
 .ans{margin:0 0 .8em;user-select:none}.ans i{display:block;height:2.1em;border-bottom:1px solid #777}
-#ed table{border-collapse:collapse;width:100%;table-layout:fixed;margin:0 0 .8em}#ed td{border:1px solid #444;padding:4px 6px;vertical-align:top;overflow-wrap:break-word}.fig{margin:0 0 .8em;text-align:center;user-select:none}.fig img{max-width:100%;height:auto}
+#ed table{border-collapse:collapse;width:100%;table-layout:fixed;margin:0 0 .8em}#ed td{border:1px solid #444;padding:4px 6px;vertical-align:top;overflow-wrap:break-word}.fig{margin:0 0 .8em;text-align:center}.fig img{max-width:100%;height:auto;border-radius:6px;border:1px solid var(--bd)}
 </style></head><body><main>
 <h1>Adaptateur ARU</h1>
 <p style="color:var(--mut);margin:0">Word, PDF, image, capture, photo (HEIC) ou manuscrit → texte modifiable en Arial 14, interligne 1,5, avec espaces de réponse.</p>
 <div class="card">
-<div class="drop" id="drop" tabindex="0" role="button">Déposez vos fichiers ici ou cliquez pour choisir<br><small>.docx · .pdf · .jpg/.png/.webp · .heic · photos de manuscrits</small></div>
+<div class="drop" id="drop" tabindex="0" role="button" aria-label="Ajouter des fichiers">Déposez vos fichiers ici ou cliquez pour choisir<br><small>.docx · .pdf · .jpg/.png/.webp · .heic · photos de manuscrits</small></div>
 <input id="inp" type="file" multiple hidden accept=".docx,.pdf,.heic,.heif,image/*">
-<div id="files"></div>
-<div class="row" style="margin-top:10px"><button id="go" disabled>Adapter le document</button><span id="st"></span></div>
+<div id="files" aria-live="polite">Aucun fichier</div>
+<div class="row" style="margin-top:10px"><button id="go" type="button" disabled>Adapter le document</button><button id="clear" type="button" class="sec">Effacer</button><span id="st" role="status" aria-live="polite" aria-atomic="true"></span></div>
 </div>
 <div class="card">
 <div class="row" style="justify-content:space-between"><strong>Texte adapté (modifiable)</strong>
-<span class="row"><button class="sec" id="addans">+ Zone de réponse</button><small style="color:var(--mut)">Double-clic sur une zone ou une image pour la supprimer</small></span></div>
+<span class="row"><button class="sec" id="addans" type="button">+ Zone de réponse</button><small style="color:var(--mut)">Double-clic sur une zone ou une image pour la supprimer</small></span></div>
 <div id="ed" contenteditable="true" spellcheck="true" lang="fr" style="margin-top:10px"></div>
 </div>
 <div class="card row"><strong>Exporter en :</strong>
 <label><input type="checkbox" id="xd" checked> Word (.docx)</label>
 <label><input type="checkbox" id="xp"> PDF</label>
-<button id="exp">Exporter</button><span id="st2" style="color:var(--mut)"></span></div>
+<button id="exp" type="button">Exporter</button><span id="st2" role="status" aria-live="polite" aria-atomic="true"></span></div>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
@@ -49,99 +50,603 @@ label{display:inline-flex;gap:6px;align-items:center}
 <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
 <script>
-const $=s=>document.querySelector(s);let files=[];
-const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-const drop=$('#drop'),inp=$('#inp');
-drop.onclick=()=>inp.click();drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')inp.click()};
-drop.ondragover=e=>{e.preventDefault();drop.classList.add('on')};drop.ondragleave=()=>drop.classList.remove('on');
-drop.ondrop=e=>{e.preventDefault();drop.classList.remove('on');add(e.dataTransfer.files)};
-inp.onchange=()=>{add(inp.files);inp.value=''};
-function add(l){files.push(...l);$('#files').textContent=files.map(f=>f.name).join(' · ');$('#go').disabled=!files.length}
-const ext=f=>(f.name.split('.').pop()||'').toLowerCase();
-/* Hors de Claude : définir window.ARU_ANALYSE = async (prompt, item) => ({blocks:[...]}) qui appelle votre propre API de vision ; item = {img:Blob} ou {text,imgs}. */
-const b2u=b=>new Promise(r=>{const f=new FileReader();f.onload=()=>r(f.result);f.readAsDataURL(b)});
-const d2b=u=>{const[h,b]=u.split(',');return new Blob([Uint8Array.from(atob(b),c=>c.charCodeAt(0))],{type:h.match(/:(.*?);/)[1]})};
-async function toJpeg(blob){const u=URL.createObjectURL(blob);const im=new Image();im.src=u;await im.decode();
- const k=Math.min(1,1800/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;
- const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);
- return new Promise(r=>c.toBlob(r,'image/jpeg',.88))}
-async function items(f){const e=ext(f);
- if(e==='heic'||e==='heif'||/hei[cf]/.test(f.type)){let b=await heic2any({blob:f,toType:'image/jpeg',quality:.9});return[{img:await toJpeg(Array.isArray(b)?b[0]:b)}]}
- if(f.type.startsWith('image/'))return[{img:await toJpeg(f)}];
- if(e==='pdf'){pdfjsLib.GlobalWorkerOptions.workerSrc='x';const d=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise;const o=[];
-  for(let i=1;i<=Math.min(d.numPages,15);i++){const p=await d.getPage(i);const v=p.getViewport({scale:1.8});const c=document.createElement('canvas');c.width=v.width;c.height=v.height;
-   await p.render({canvasContext:c.getContext('2d'),viewport:v}).promise;o.push({img:await new Promise(r=>c.toBlob(r,'image/jpeg',.88))})}return o}
- if(e==='docx'){const raw=[];const r=await mammoth.convertToHtml({arrayBuffer:await f.arrayBuffer()},{convertImage:mammoth.images.imgElement(async i=>{raw.push('data:'+i.contentType+';base64,'+await i.read('base64'));return{src:'IMG'+(raw.length-1)}})});
-  const imgs=[];for(const u of raw){try{imgs.push(await b2u(await toJpeg(d2b(u))))}catch(_){imgs.push(null)}}
-  return[{text:r.value,imgs}]}
- throw new Error('Format non pris en charge : '+f.name)}
-const PROMPT=`Tu prépares un document scolaire pour des élèves à besoins spécifiques (ARU). Retranscris FIDÈLEMENT le contenu fourni (image, manuscrit ou HTML), en français, sans reformuler, sans corriger le sens, sans couper ni changer les mots, dans l'ordre de lecture.
-Réponds UNIQUEMENT par du JSON : {"blocks":[{"t":"h1|h2|p|ans|tbl|img","x":"texte","n":3}]}
-- h1 = titre, h2 = sous-titre/intitulé de section, p = paragraphe, consigne ou question (garde la numérotation d'origine, ex. "1." ou "a)").
-- Dans "x", entoure de ** les MOTS-CLÉS des consignes (verbes d'action comme Relie, Souligne, Complète, Justifie, Entoure, Calcule, ainsi que les mots décisifs comme "deux", "uniquement", "pas").
-- Ajoute après une question/consigne un bloc {"t":"ans","n":N} quand une réponse est attendue (lignes à compléter, cadre vide, trou à remplir) : N = nombre de lignes de 1 à 8 selon la place d'origine ou la longueur probable de la réponse.
-- Tableau : {"t":"tbl","rows":[["cellule","cellule"],["…","…"]]}, fidèle à la structure d'origine (cellule vide = "", cellule à compléter par l'élève = ""), mots-clés en **gras** possibles dans les cellules.
-- Image, figure, schéma, dessin, photo (pas le texte) : {"t":"img","box":[x0,y0,x1,y1]} = cadre en fractions de 0 à 1 de l'image fournie (x0,y0 = coin haut-gauche), placé à sa position dans l'ordre de lecture. Si le contenu est du HTML avec <img src="IMGn">, utilise {"t":"img","ref":n}.
+const $ = (selector) => document.querySelector(selector);
+const state = { files: [], active: false };
+const esc = (value) => String(value ?? '').replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]));
+const inlineMarkup = (value) => esc(value).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+const setStatus = (id, message) => { const el = $(id); if (el) el.textContent = message; };
+const getExt = (file) => (file.name.split('.').pop() || '').toLowerCase();
+const isSupportedFile = (file) => {
+  const ext = getExt(file);
+  const okExt = ['docx', 'pdf', 'png', 'jpg', 'jpeg', 'webp', 'heic', 'heif'];
+  return okExt.includes(ext) || file.type.startsWith('image/');
+};
+const drop = $('#drop'), inp = $('#inp');
+
+function updateFileList() {
+  const filesText = state.files.length ? state.files.map((f) => f.name).join(' · ') : 'Aucun fichier';
+  $('#files').textContent = filesText;
+  $('#go').disabled = !state.files.length || state.active;
+}
+
+function clearFiles() {
+  state.files = [];
+  inp.value = '';
+  $('#ed').innerHTML = '';
+  updateFileList();
+  setStatus('#st', '');
+}
+
+function add(list) {
+  const next = [...list].filter((file) => isSupportedFile(file));
+  const seen = new Set(state.files.map((file) => `${file.name}-${file.size}-${file.lastModified}`));
+  const unique = next.filter((file) => {
+    const key = `${file.name}-${file.size}-${file.lastModified}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if (!unique.length) {
+    setStatus('#st', 'Aucun fichier valide ajouté.');
+    return;
+  }
+
+  state.files.push(...unique);
+  updateFileList();
+  setStatus('#st', `${unique.length} fichier${unique.length > 1 ? 's' : ''} ajouté${unique.length > 1 ? 's' : ''}.`);
+}
+
+drop.onclick = () => inp.click();
+drop.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inp.click(); } };
+drop.ondragover = (event) => { event.preventDefault(); drop.classList.add('on'); };
+drop.ondragleave = () => drop.classList.remove('on');
+drop.ondrop = (event) => { event.preventDefault(); drop.classList.remove('on'); add(event.dataTransfer.files); };
+inp.onchange = () => { add(inp.files); inp.value = ''; };
+$('#clear').onclick = clearFiles;
+
+const b2u = (blob) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(new Error('Lecture du fichier impossible.'));
+  reader.readAsDataURL(blob);
+});
+
+const d2b = (dataUrl) => {
+  const [header, body] = dataUrl.split(',');
+  const mimeMatch = header.match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  return new Blob([Uint8Array.from(atob(body), (char) => char.charCodeAt(0))], { type: mime });
+};
+
+async function toJpeg(blob) {
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = new Image();
+    image.src = objectUrl;
+    await image.decode();
+    const scale = Math.min(1, 1800 / Math.max(image.width, image.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Conversion JPEG impossible.')), 'image/jpeg', 0.88));
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function crop(blob, box) {
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = new Image();
+    image.src = objectUrl;
+    await image.decode();
+    const [x0, y0, x1, y1] = box.map((value) => Math.max(0, Math.min(1, Number(value) || 0)));
+    const width = Math.max(1, (x1 - x0) * image.width);
+    const height = Math.max(1, (y1 - y0) * image.height);
+    const x = x0 * image.width;
+    const y = y0 * image.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(width);
+    canvas.height = Math.round(height);
+    const context = canvas.getContext('2d');
+    context.drawImage(image, x, y, width, height, 0, 0, canvas.width, canvas.height);
+    return await new Promise((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Découpage de l’image impossible.')), 'image/jpeg', 0.9));
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function items(file) {
+  const ext = getExt(file);
+
+  if (ext === 'heic' || ext === 'heif' || /hei[cf]/.test(file.type || '')) {
+    if (typeof window.heic2any === 'undefined') throw new Error('Le support HEIC est indisponible.');
+    const converted = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
+    const blob = Array.isArray(converted) ? converted[0] : converted;
+    return [{ img: await toJpeg(blob) }];
+  }
+
+  if (file.type.startsWith('image/')) {
+    return [{ img: await toJpeg(file) }];
+  }
+
+  if (ext === 'pdf') {
+    if (!window.pdfjsLib) throw new Error('pdf.js est introuvable.');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const documentPdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const pages = [];
+    for (let index = 1; index <= Math.min(documentPdf.numPages, 15); index += 1) {
+      const page = await documentPdf.getPage(index);
+      const viewport = page.getViewport({ scale: 1.8 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const context = canvas.getContext('2d');
+      await page.render({ canvasContext: context, viewport }).promise;
+      pages.push({ img: await new Promise((resolve, reject) => { canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Page PDF non rendue.')), 'image/jpeg', 0.88); }) });
+    }
+    return pages;
+  }
+
+  if (ext === 'docx') {
+    if (!window.mammoth) throw new Error('mammoth.js est introuvable.');
+    const rawImages = [];
+    const result = await window.mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() }, {
+      convertImage: window.mammoth.images.imgElement(async (image) => {
+        const dataUrl = 'data:' + image.contentType + ';base64,' + await image.read('base64');
+        rawImages.push(dataUrl);
+        return { src: dataUrl };
+      })
+    });
+
+    const imgs = [];
+    for (const raw of rawImages) {
+      try {
+        imgs.push(await b2u(await toJpeg(d2b(raw))));
+      } catch (_error) {
+        imgs.push(null);
+      }
+    }
+
+    return [{ text: result.value, imgs }];
+  }
+
+  throw new Error('Format non pris en charge : ' + file.name);
+}
+
+const PROMPT = `Tu prépares un document scolaire pour des élèves à besoins spécifiques (ARU). Retranscris FIDÈLEMENT le contenu fourni (image, manuscrit ou HTML), en français, sans reformuler, sans supprimer d'éléments, sans ajouter d'informations non présentes. Respecte la structure du document original et les consignes pédagogiques.
+
+Règles de sortie strictes :
+- Réponds UNIQUEMENT par du JSON : {"blocks":[{"t":"h1|h2|p|ans|tbl|img","x":"texte","n":3}]}
+- h1 = titre, h2 = sous-titre/intitulé de section, p = paragraphe, consigne ou question (garde la numérotation d'origine, ex. "1." ou "a)")
+- Dans "x", entoure de ** les MOTS-CLÉS des consignes (verbes d'action comme Relie, Souligne, Complète, Justifie, Entoure, Calcule, ainsi que les mots décisifs comme "deux", "uniquement", "pas")
+- Ajoute après une question/consigne un bloc {"t":"ans","n":N} quand une réponse est attendue (lignes à compléter, cadre vide, trou à remplir) : N = nombre de lignes de 1 à 8 selon la place disponible
+- Tableau : {"t":"tbl","rows":[["cellule","cellule"],["…","…"]]}, fidèle à la structure d'origine (cellule vide = "", cellule à compléter par l'élève = "") ; mots-clés en **gras** autorisés
+- Image, figure, schéma, dessin, photo (pas le texte) : {"t":"img","box":[x0,y0,x1,y1]} = cadre en fractions de 0 à 1 de l'image fournie (x0,y0 = coin haut-gauche), placé à sa position dans l'ordre du document ; s'il y a un texte ou une légende, le garder dans un bloc p juste avant ou après l’image.
 - Ignore numéros de page et décorations. Pas de markdown autre que **gras**.`;
-async function crop(blob,bx){const u=URL.createObjectURL(blob);const im=new Image();im.src=u;await im.decode();const[x0,y0,x1,y1]=bx.map(v=>Math.max(0,Math.min(1,+v)));const w=(x1-x0)*im.width,h=(y1-y0)*im.height;if(!(w>30&&h>30))throw 0;const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,x0*im.width,y0*im.height,w,h,0,0,w,h);URL.revokeObjectURL(u);return c.toDataURL('image/jpeg',.9)}
-const inl=s=>esc(String(s||'')).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
-async function render(bl,it){const ed=$('#ed');for(const b of bl){let h='';
- if(b.t==='ans'){h=`<div class="ans" contenteditable="false" data-n="${Math.max(1,Math.min(10,+b.n||2))}">${'<i></i>'.repeat(Math.max(1,Math.min(10,+b.n||2)))}</div>`}
- else if(b.t==='tbl'&&Array.isArray(b.rows)){h='<table>'+b.rows.map(r=>'<tr>'+(Array.isArray(r)?r:[r]).map(c=>`<td>${inl(c)}</td>`).join('')+'</tr>').join('')+'</table>'}
- else if(b.t==='img'){try{const u=b.ref!=null?it.imgs[+b.ref]:await crop(it.img,b.box);if(u)h=`<div class="fig" contenteditable="false"><img src="${u}" alt=""></div>`}catch(_){}}
- else{const tag=b.t==='h1'?'h1':b.t==='h2'?'h2':'p';h=`<${tag}>${inl(b.x)}</${tag}>`}
- if(h)ed.insertAdjacentHTML('beforeend',h)}}
-$('#go').onclick=async()=>{const st=$('#st'),go=$('#go');go.disabled=true;$('#ed').innerHTML='';
- try{const sample=window.claude?await claude.use('sample'):null;if(!sample&&!window.ARU_ANALYSE)throw new Error("Analyse indisponible : hors de Claude, définissez window.ARU_ANALYSE (voir le commentaire du script).");
-  if(sample){const lim=await sample.limits();if(!lim.images)throw new Error("L'analyse d'images n'est pas disponible pour votre compte.")}
-  let n=0;for(const f of files){st.textContent='Préparation de '+f.name+'…';const its=await items(f);
-   for(const it of its){n++;st.textContent=`Analyse ${n}…`;
-    const inpt=it.text?[{role:'user',content:PROMPT+'\n\nContenu HTML :\n'+it.text}]:[{role:'user',content:PROMPT}];
-    const r=sample?await sample.json(inpt,it.img?{images:[it.img],cache:false}:{cache:false}):await window.ARU_ANALYSE(inpt[0].content,it);await render((r&&r.blocks)||[],it)}}
-  st.textContent='Terminé. Relisez et corrigez le texte avant l’export.'}
- catch(e){st.textContent='Erreur : '+(e.message||e.code||e)}
- go.disabled=false};
-$('#ed').addEventListener('dblclick',e=>{const a=e.target.closest('.ans,.fig');if(a)a.remove()});
-$('#addans').onclick=()=>{const ed=$('#ed');const s=getSelection();let n=s.rangeCount?s.anchorNode:null;while(n&&n.parentNode!==ed)n=n.parentNode;
- const d=document.createElement('div');d.className='ans';d.contentEditable='false';d.dataset.n=3;d.innerHTML='<i></i><i></i><i></i>';n?n.after(d):ed.append(d)};
-function runsOf(el,bold){const runs=[];(function w(n,b){for(const c of n.childNodes){if(c.nodeType===3){if(c.textContent)runs.push({t:c.textContent.replace(/\s+/g,' '),b})}else if(c.nodeType===1){if(c.tagName==='BR')runs.push({t:' ',b});else w(c,b||/^(B|STRONG)$/.test(c.tagName)||/^(bold|[6-9]00)$/.test(c.style.fontWeight))}}})(el,bold);return runs}
-function model(){const o=[];for(const el of $('#ed').children){
- if(el.classList.contains('ans')){o.push({k:'a',n:+el.dataset.n||2});continue}
- if(el.classList.contains('fig')){const im=el.querySelector('img');if(im&&im.naturalWidth)o.push({k:'i',u:im.src,w:im.naturalWidth,h:im.naturalHeight});continue}
- if(el.tagName==='TABLE'){o.push({k:'t',rows:[...el.rows].map(r=>[...r.cells].map(c=>runsOf(c,false)))});continue}
- const k=el.tagName==='H1'||el.tagName==='H2'?'h':'p';const runs=runsOf(el,k==='h');
- if(runs.some(r=>r.t.trim()))o.push({k,runs})}return o}
-async function mkDocx(m){const D=docx;const P=[];const f='Arial';
- for(const b of m){if(b.k==='t'){const nc=Math.max(...b.rows.map(r=>r.length)),cw=Math.floor(9638/nc),bd={style:D.BorderStyle.SINGLE,size:6,color:'444444'},B={top:bd,bottom:bd,left:bd,right:bd};
-  P.push(new D.Table({width:{size:cw*nc,type:D.WidthType.DXA},columnWidths:Array(nc).fill(cw),rows:b.rows.map(r=>new D.TableRow({cantSplit:true,children:Array.from({length:nc},(_,i)=>new D.TableCell({width:{size:cw,type:D.WidthType.DXA},borders:B,margins:{top:60,bottom:60,left:100,right:100},children:[new D.Paragraph({keepLines:true,spacing:{line:360},children:(r[i]||[]).map(x=>new D.TextRun({text:x.t,bold:x.b,font:f,size:28}))})]}))}))}));P.push(new D.Paragraph({children:[]}));continue}
- if(b.k==='i'){const s=Math.min(1,560/b.w,480/b.h);P.push(new D.Paragraph({keepLines:true,spacing:{after:160},children:[new D.ImageRun({data:Uint8Array.from(atob(b.u.split(',')[1]),c=>c.charCodeAt(0)),type:'jpg',transformation:{width:Math.round(b.w*s),height:Math.round(b.h*s)}})]}));continue}
- if(b.k==='a'){for(let i=0;i<b.n;i++)P.push(new D.Paragraph({spacing:{line:480},border:{bottom:{style:D.BorderStyle.SINGLE,size:6,color:'808080',space:1}},children:[new D.TextRun({text:'',font:f,size:28})]}));P.push(new D.Paragraph({children:[]}))}
- else P.push(new D.Paragraph({keepLines:true,keepNext:b.k==='h',spacing:{line:360,before:b.k==='h'?240:0,after:160},children:b.runs.map(r=>new D.TextRun({text:r.t,bold:r.b,font:f,size:28}))}))}
- const d=new D.Document({styles:{default:{document:{run:{font:f,size:28},paragraph:{spacing:{line:360}}}}},sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1134,bottom:1134,left:1134,right:1134}}},children:P}]});
- return D.Packer.toBlob(d)}
-function mkPdf(m){const doc=new jspdf.jsPDF({unit:'pt',format:'a4'});const W=595.28,H=841.89,M=56,LH=21,maxX=W-M;let y=M;doc.setFontSize(14);
- const nl=n=>{if(y+n>H-M){doc.addPage();y=M}};
- const lay=(runs,W)=>{const L=[[]];let x=0;for(const q of runs)for(const w of q.t.split(/(\s+)/)){if(!w)continue;doc.setFont('helvetica',q.b?'bold':'normal');const t=doc.getTextWidth(w);if(/^\s+$/.test(w)){if(x)x+=t;continue}if(x+t>W&&x){L.push([]);x=0}L[L.length-1].push({w,b:q.b,x});x+=t}return L};
- for(const b of m){if(b.k==='i'){const s=Math.min(1,(maxX-M)/b.w,400/b.h),w=b.w*s,h=b.h*s;nl(h+8);doc.addImage(b.u,'JPEG',M,y,w,h);y+=h+12;continue}
-  if(b.k==='t'){const nc=Math.max(...b.rows.map(r=>r.length)),cw=(maxX-M)/nc,pd=5;doc.setDrawColor(70);
-   for(const r of b.rows){const cl=Array.from({length:nc},(_,i)=>lay(r[i]||[],cw-2*pd));const h=Math.max(1,...cl.map(l=>l.length))*LH+2*pd;nl(h);
-    cl.forEach((L,i)=>{const x0=M+i*cw;doc.rect(x0,y,cw,h);L.forEach((ln,j)=>ln.forEach(t=>{doc.setFont('helvetica',t.b?'bold':'normal');doc.text(t.w,x0+pd+t.x,y+pd+(j+1)*LH-6)}))});y+=h}
-   y+=LH*.6;continue}
-  if(b.k==='a'){nl(LH*1.6*b.n);for(let i=0;i<b.n;i++){y+=LH*1.6;doc.setDrawColor(120);doc.line(M,y,maxX,y)}y+=LH*.6;continue}
-  if(b.k==='h')nl(LH*3);y+=b.k==='h'?8:0;
-  const words=[];for(const r of b.runs)for(const w of r.t.split(/(\s+)/))if(w)words.push({w,b:r.b});
-  let x=M;y+=LH;nl(0);const wd=t=>{doc.setFont('helvetica',t.b?'bold':'normal');return doc.getTextWidth(t.w)};
-  for(const t of words){const sp=/^\s+$/.test(t.w);const w=wd(t);
-   if(sp){if(x>M)x+=w;continue}
-   if(x+w>maxX&&x>M){x=M;y+=LH;if(y>H-M){doc.addPage();y=M+LH}}
-   doc.setFont('helvetica',t.b?'bold':'normal');doc.text(t.w,x,y);x+=w}
-  y+=b.k==='h'?4:LH*.4}
- return doc.output('blob')}
-$('#exp').onclick=async()=>{const st=$('#st2');const m=model();
- if(!m.length){st.textContent='Rien à exporter.';return}
- if(!$('#xd').checked&&!$('#xp').checked){st.textContent='Cochez au moins un format.';return}
- try{const dl=window.claude?await claude.use('downloads'):null;const save=(n,b)=>dl?dl.save({filename:n,data:b}):Object.assign(document.createElement('a'),{href:URL.createObjectURL(b),download:n}).click();
-  if($('#xd').checked)await save('document-ARU.docx',await mkDocx(m));
-  if($('#xp').checked)await save('document-ARU.pdf',mkPdf(m));
-  st.textContent='Export demandé.'}catch(e){st.textContent='Erreur : '+(e.message||e.code||e)}};
+
+function renderBlocks(blocks, item = {}) {
+  const ed = $('#ed');
+  const fragment = document.createDocumentFragment();
+
+  for (const block of blocks) {
+    if (!block || typeof block.t !== 'string') continue;
+
+    if (block.t === 'ans') {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'ans';
+      wrapper.contentEditable = 'false';
+      const count = Math.max(1, Math.min(10, Number(block.n) || 2));
+      wrapper.dataset.n = String(count);
+      for (let index = 0; index < count; index += 1) {
+        const line = document.createElement('i');
+        wrapper.appendChild(line);
+      }
+      fragment.appendChild(wrapper);
+      continue;
+    }
+
+    if (block.t === 'tbl' && Array.isArray(block.rows)) {
+      const table = document.createElement('table');
+      for (const row of block.rows) {
+        const tr = document.createElement('tr');
+        const cells = Array.isArray(row) ? row : [row];
+        for (const cell of cells) {
+          const td = document.createElement('td');
+          td.innerHTML = inlineMarkup(String(cell ?? ''));
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      fragment.appendChild(table);
+      continue;
+    }
+
+    if (block.t === 'img') {
+      try {
+        let source = null;
+        if (Array.isArray(item.imgs) && block.ref != null) {
+          source = item.imgs[Number(block.ref)];
+        }
+        if (!source && item.img) {
+          source = await crop(item.img, block.box || [0, 0, 1, 1]);
+        }
+        if (source) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'fig';
+          wrapper.contentEditable = 'false';
+          const image = document.createElement('img');
+          image.src = typeof source === 'string' ? source : URL.createObjectURL(source);
+          image.alt = '';
+          if (typeof source !== 'string') {
+            image.onload = () => URL.revokeObjectURL(image.src);
+          }
+          wrapper.appendChild(image);
+          fragment.appendChild(wrapper);
+        }
+      } catch (_error) {
+        // Ignore malformed image blocks.
+      }
+      continue;
+    }
+
+    const tag = block.t === 'h1' ? 'h1' : block.t === 'h2' ? 'h2' : 'p';
+    const node = document.createElement(tag);
+    node.innerHTML = inlineMarkup(block.x ?? '');
+    fragment.appendChild(node);
+  }
+
+  ed.appendChild(fragment);
+}
+
+async function performAnalysis() {
+  if (state.active) return;
+  state.active = true;
+  const goButton = $('#go');
+  const status = $('#st');
+  goButton.disabled = true;
+  $('#ed').innerHTML = '';
+  setStatus('#st', 'Préparation…');
+
+  try {
+    const sample = window.claude ? await window.claude.use('sample') : null;
+    if (!sample && typeof window.ARU_ANALYSE !== 'function') {
+      throw new Error('Analyse indisponible : hors de Claude, définissez window.ARU_ANALYSE.');
+    }
+    if (sample) {
+      const limits = await sample.limits();
+      if (!limits.images) {
+        throw new Error("L'analyse d'images n'est pas disponible pour votre compte.");
+      }
+    }
+
+    let processed = 0;
+    for (const file of state.files) {
+      setStatus('#st', `Préparation de ${file.name}…`);
+      const pieces = await items(file);
+      for (const item of pieces) {
+        processed += 1;
+        setStatus('#st', `Analyse ${processed}…`);
+        const prompt = item.text ? [{ role: 'user', content: PROMPT + '\n\nContenu HTML :\n' + item.text }] : [{ role: 'user', content: PROMPT }];
+        let result;
+        if (sample) {
+          result = await sample.json(prompt, item.img ? { images: [item.img], cache: false } : { cache: false });
+        } else {
+          result = await window.ARU_ANALYSE(prompt[0].content, item);
+        }
+        await renderBlocks(result && Array.isArray(result.blocks) ? result.blocks : [], item);
+      }
+    }
+
+    setStatus('#st', 'Terminé. Relisez et corrigez le texte avant l’export.');
+  } catch (error) {
+    setStatus('#st', 'Erreur : ' + (error.message || error.code || String(error)));
+  } finally {
+    state.active = false;
+    goButton.disabled = !state.files.length;
+  }
+}
+
+$('#go').onclick = performAnalysis;
+
+$('#ed').addEventListener('dblclick', (event) => {
+  const target = event.target.closest('.ans, .fig');
+  if (target) target.remove();
+});
+
+$('#addans').onclick = () => {
+  const ed = $('#ed');
+  const selection = window.getSelection();
+  let anchor = selection && selection.rangeCount ? selection.anchorNode : null;
+  while (anchor && anchor.parentNode && anchor.parentNode !== ed) {
+    anchor = anchor.parentNode;
+  }
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ans';
+  wrapper.contentEditable = 'false';
+  wrapper.dataset.n = '3';
+  for (let index = 0; index < 3; index += 1) {
+    const line = document.createElement('i');
+    wrapper.appendChild(line);
+  }
+  if (anchor && anchor.parentNode === ed) {
+    anchor.after(wrapper);
+  } else {
+    ed.appendChild(wrapper);
+  }
+};
+
+function runsOf(element, bold) {
+  const runs = [];
+  (function walk(node, forceBold) {
+    for (const child of node.childNodes) {
+      if (child.nodeType === 3) {
+        const text = child.textContent || '';
+        if (text.trim()) runs.push({ t: text.replace(/\s+/g, ' '), b: !!forceBold });
+      } else if (child.nodeType === 1) {
+        if (child.tagName === 'B' || child.tagName === 'STRONG') {
+          walk(child, true);
+        } else {
+          walk(child, forceBold);
+        }
+      }
+    }
+  })(element, bold);
+  return runs;
+}
+
+function model() {
+  const output = [];
+  for (const element of $('#ed').children) {
+    if (element.classList.contains('ans')) {
+      output.push({ k: 'a', n: Number(element.dataset.n) || 2 });
+      continue;
+    }
+    if (element.classList.contains('fig')) {
+      const img = element.querySelector('img');
+      if (img && img.naturalWidth) {
+        output.push({ k: 'i', u: img.src, w: img.naturalWidth, h: img.naturalHeight });
+      }
+      continue;
+    }
+    if (element.tagName === 'TABLE') {
+      output.push({ k: 't', rows: [...element.rows].map((row) => [...row.cells].map((cell) => runsOf(cell, false))) });
+      continue;
+    }
+    const type = element.tagName === 'H1' || element.tagName === 'H2' ? 'h' : 'p';
+    const runs = runsOf(element, type === 'h');
+    if (runs.some((run) => run.t.trim())) output.push({ k: type, runs });
+  }
+  return output;
+}
+
+async function mkDocx(modelData) {
+  const D = window.docx;
+  const paragraphs = [];
+  const font = 'Arial';
+
+  for (const block of modelData) {
+    if (block.k === 't') {
+      const colCount = Math.max(...block.rows.map((row) => row.length));
+      const cellWidth = Math.floor(9638 / colCount);
+      const border = { style: D.BorderStyle.SINGLE, size: 6, color: '444444' };
+      paragraphs.push(new D.Table({
+        width: { size: cellWidth * colCount, type: D.WidthType.DXA },
+        columnWidths: Array(colCount).fill(cellWidth),
+        rows: block.rows.map((row) => new D.TableRow({
+          cantSplit: true,
+          children: row.map((cell) => new D.TableCell({
+            borders: { top: border, bottom: border, left: border, right: border },
+            shading: { fill: 'FFFFFF' },
+            children: cell.map((run) => new D.Paragraph({ children: [new D.TextRun({ text: run.t, bold: run.b, font: font, size: 24 })] }))
+          }))
+        }))
+      }));
+      continue;
+    }
+
+    if (block.k === 'i') {
+      const base64 = block.u.split(',')[1] || '';
+      const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+      paragraphs.push(new D.Paragraph({ keepLines: true, spacing: { after: 160 }, children: [new D.ImageRun({ data: bytes, transformation: { width: 480, height: 320 } })] }));
+      continue;
+    }
+
+    if (block.k === 'a') {
+      for (let index = 0; index < block.n; index += 1) {
+        paragraphs.push(new D.Paragraph({ spacing: { line: 480 }, border: { bottom: { style: D.BorderStyle.SINGLE, size: 6, color: '808080', space: 1 } }, children: [new D.TextRun({ text: '', font: font, size: 24 })] }));
+      }
+      continue;
+    }
+
+    paragraphs.push(new D.Paragraph({
+      keepLines: true,
+      keepNext: block.k === 'h',
+      spacing: { line: 360, before: block.k === 'h' ? 240 : 0, after: 160 },
+      children: block.runs.map((run) => new D.TextRun({ text: run.t, bold: run.b, font: font, size: 28 }))
+    }));
+  }
+
+  const doc = new D.Document({
+    styles: { default: { document: { run: { font: font, size: 28 }, paragraph: { spacing: { line: 360 } } } } },
+    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } }, children: paragraphs }]
+  });
+  return D.Packer.toBlob(doc);
+}
+
+function mkPdf(modelData) {
+  const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 56;
+  const lineHeight = 21;
+  const maxWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const nextLine = (extra = 0) => {
+    if (y + extra > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  };
+
+  const layoutRuns = (runs, widthLimit) => {
+    const lines = [[]];
+    let x = 0;
+    for (const run of runs) {
+      for (const word of run.t.split(/(\s+)/)) {
+        if (!word) continue;
+        const textWidth = doc.getTextWidth(word);
+        if (/^\s+$/.test(word)) {
+          x += textWidth;
+          continue;
+        }
+        if (x + textWidth > widthLimit && x > 0) {
+          lines.push([]);
+          x = 0;
+        }
+        lines[lines.length - 1].push({ text: word, bold: run.b, x });
+        x += textWidth;
+      }
+    }
+    return lines;
+  };
+
+  for (const block of modelData) {
+    if (block.k === 'i') {
+      const width = Math.min(maxWidth, 400);
+      const scale = Math.min(1, width / block.w);
+      const imgWidth = block.w * scale;
+      const imgHeight = block.h * scale;
+      nextLine(imgHeight + 20);
+      doc.addImage(block.u, 'JPEG', margin, y, imgWidth, imgHeight);
+      y += imgHeight + 20;
+      continue;
+    }
+
+    if (block.k === 't') {
+      const columnCount = Math.max(...block.rows.map((row) => row.length));
+      const cellWidth = (maxWidth - 10) / columnCount;
+      const cellPadding = 5;
+      for (const row of block.rows) {
+        const rowLines = [];
+        for (let index = 0; index < columnCount; index += 1) {
+          const cell = row[index] || [];
+          rowLines.push(layoutRuns(cell, cellWidth - cellPadding * 2));
+        }
+        const rowHeight = Math.max(1, ...rowLines.map((lines) => lines.length)) * lineHeight + cellPadding * 2;
+        nextLine(rowHeight + 8);
+        rowLines.forEach((cellLines, index) => {
+          const left = margin + index * cellWidth;
+          doc.rect(left, y, cellWidth, rowHeight);
+          cellLines.forEach((line, lineIndex) => {
+            line.forEach((token) => {
+              doc.setFont('helvetica', token.bold ? 'bold' : 'normal');
+              doc.text(token.text, left + cellPadding + token.x, y + cellPadding + (lineIndex + 1) * lineHeight - 6);
+            });
+          });
+        });
+        y += rowHeight;
+      }
+      y += lineHeight * 0.6;
+      continue;
+    }
+
+    if (block.k === 'a') {
+      nextLine(lineHeight * 1.6 * block.n);
+      for (let index = 0; index < block.n; index += 1) {
+        y += lineHeight * 1.6;
+        doc.setDrawColor(120);
+        doc.line(margin, y, pageWidth - margin, y);
+      }
+      y += lineHeight * 0.6;
+      continue;
+    }
+
+    nextLine(16);
+    if (block.k === 'h') {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      y += 8;
+    } else {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+    }
+
+    let x = margin;
+    const words = [];
+    for (const run of block.runs) {
+      for (const word of run.t.split(/(\s+)/)) {
+        if (word) words.push({ text: word, bold: run.b });
+      }
+    }
+
+    for (const token of words) {
+      const textWidth = doc.getTextWidth(token.text);
+      doc.setFont('helvetica', token.bold ? 'bold' : 'normal');
+      if (/^\s+$/.test(token.text)) {
+        if (x > margin) x += textWidth;
+        continue;
+      }
+      if (x + textWidth > pageWidth - margin && x > margin) {
+        x = margin;
+        y += lineHeight;
+        nextLine(0);
+      }
+      doc.text(token.text, x, y);
+      x += textWidth;
+    }
+    y += block.k === 'h' ? 10 : lineHeight * 0.4;
+  }
+
+  return doc.output('blob');
+}
+
+async function saveBlob(filename, blob) {
+  const downloads = window.claude ? await window.claude.use('downloads') : null;
+  if (downloads && typeof downloads.save === 'function') {
+    await downloads.save({ filename, data: blob });
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+$('#exp').onclick = async () => {
+  const status = $('#st2');
+  const modelData = model();
+  if (!modelData.length) {
+    setStatus('#st2', 'Rien à exporter.');
+    return;
+  }
+  if (!$('#xd').checked && !$('#xp').checked) {
+    setStatus('#st2', 'Cochez au moins un format.');
+    return;
+  }
+
+  try {
+    if ($('#xd').checked) {
+      await saveBlob('document-ARU.docx', await mkDocx(modelData));
+    }
+    if ($('#xp').checked) {
+      await saveBlob('document-ARU.pdf', mkPdf(modelData));
+    }
+    setStatus('#st2', 'Export demandé.');
+  } catch (error) {
+    setStatus('#st2', 'Erreur : ' + (error.message || error.code || String(error)));
+  }
+};
+
+updateFileList();
 </script></body></html>
