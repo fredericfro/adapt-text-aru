@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adapt'Text ARU - Adaptation de Documents & Accessibilité</title>
+    <!-- Tailwind CSS pour un design moderne & responsive -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts pour Arial/Sans-serif et OpenDyslexic fallback -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Bibliothèques pour le traitement de fichiers et l'exportation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        aru: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                        },
+                        reading: {
+                            cream: '#fbf9f1',
+                            yellow: '#fef9c3',
+                            blue: '#e0f2fe',
+                            green: '#dc2626'
+                        }
+                    },
+                    fontFamily: {
+                        arial: ['Arial', 'Helvetica', 'sans-serif'],
+                        dyslexic: ['Atkinson Hyperlegible', 'sans-serif'],
+                        verdana: ['Verdana', 'Geneva', 'sans-serif'],
+                        lexend: ['Lexend', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @font-face {
+            font-family: 'OpenDyslexic';
+            src: url('https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/sans-serif/OpenDyslexic-Regular.otf');
+        }
+        .font-opendyslexic {
+            font-family: 'OpenDyslexic', 'Atkinson Hyperlegible', sans-serif !important;
+        }
+        .aru-preview {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 14pt;
+            line-height: 1.5;
+            color: #1e293b;
+        }
+        /* Style des lignes de réponses supplémentaires */
+        .aru-response-line {
+            border-bottom: 1.5px dashed #94a3b8;
+            margin-top: 1.2rem;
+            margin-bottom: 1.2rem;
+            height: 1.8rem;
+            display: block;
+            width: 100%;
+        }
+        .aru-response-box {
+            border: 2px stroke #cbd5e1;
+            background-color: rgba(255, 255, 255, 0.6);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+            min-height: 80px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased selection:bg-sky-200">
+
+    <!-- En-tête principal / Navigation -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-aru-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
+                        <i class="fa-solid fa-universal-access text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight">Adapt'Text <span class="text-aru-600 text-xs px-2 py-0.5 rounded-full bg-sky-100 font-semibold uppercase tracking-wider">ARU</span></h1>
+                        <p class="text-xs text-slate-500">Aménagements Raisonnables Universels pour l'apprentissage</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <button id="btnMobileGuide" class="inline-flex items-center text-sm font-medium text-slate-600 hover:text-aru-600 px-3 py-2 rounded-lg hover:bg-slate-100 transition">
+                        <i class="fa-solid fa-mobile-screen-button mr-2 text-aru-600"></i>
+                        <span class="hidden sm:inline">Version Mobile / App</span>
+                    </button>
+                    <a href="#helpModal" id="btnHelp" class="text-slate-500 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition" title="Aide & Normes ARU">
+                        <i class="fa-solid fa-circle-info text-xl"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Container Principal (2 Colonnes Responsive) -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- COLONNE GAUCHE: Contrôles & Importation (5 colonnes sur large écran) -->
+        <section class="lg:col-span-5 flex flex-col gap-5">
+            
+            <!-- Zone d'Importation de Fichier -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <h2 class="text-base font-semibold text-slate-900 mb-3 flex items-center">
+                    <i class="fa-solid fa-file-arrow-up mr-2 text-aru-600"></i>
+                    1. Importer un document
+                </h2>
+
+                <!-- Zone Drag & Drop -->
+                <div id="dropZone" class="border-2 border-dashed border-slate-300 hover:border-aru-500 bg-slate-50 hover:bg-sky-50/50 rounded-xl p-5 text-center transition cursor-pointer relative">
+                    <input type="file" id="fileInput" accept=".docx,.pdf,.jpg,.jpeg,.png" class="hidden">
+                    <div class="flex flex-col items-center justify-center space-y-2">
+                        <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-aru-600 shadow-sm border border-slate-100">
+                            <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                        </div>
+                        <p class="text-sm font-medium text-slate-700">
+                            Glissez votre fichier ici ou <span class="text-aru-600 underline">parcourir</span>
+                        </p>
+                        <p class="text-xs text-slate-400">PDF, Word (.docx), Images (.png, .jpg)</p>
+                    </div>
+                </div>
+
+                <!-- Modèles de démo rapide -->
+                <div class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-xs text-slate-500 font-medium">Tester un exemple :</span>
+                    <div class="flex gap-2">
+                        <button id="btnDemoExercise" class="text-xs bg-slate-100 hover:bg-aru-100 text-slate-700 hover:text-aru-700 px-2.5 py-1.5 rounded-md font-medium transition">
+                            <i class="fa-solid fa-pen-ruler mr-1"></i> Exercice
+                        </button>
+                        <button id="btnDemoText" class="text-xs bg-slate-100 hover:bg-aru-100 text-slate-700 hover:text-aru-700 px-2.5 py-1.5 rounded-md font-medium transition">
+                            <i class="fa-solid fa-book-open mr-1"></i> Lecture
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Progrès / Statut de chargement OCR -->
+                <div id="statusContainer" class="hidden mt-4 p-3 bg-sky-50 rounded-lg border border-sky-100 text-xs text-sky-800 flex items-center space-x-3">
+                    <div class="animate-spin rounded-full h-4 w-4 border-2 border-aru-600 border-t-transparent"></div>
+                    <span id="statusText">Extraction du texte en cours...</span>
+                </div>
+            </div>
+
+            <!-- Panneau de Configuration ARU -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-slate-900 mb-4 flex items-center">
+                        <i class="fa-solid fa-sliders mr-2 text-aru-600"></i>
+                        2. Options d'aménagement ARU
+                    </h2>
+
+                    <div class="space-y-4">
+                        <!-- Typographie -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Police de caractères</label>
+                            <select id="fontSelect" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-aru-500 focus:border-aru-500">
+                                <option value="arial" selected>Arial (Recommandé ARU)</option>
+                                <option value="dyslexic">OpenDyslexic / Atkinson</option>
+                                <option value="verdana">Verdana (Aérée)</option>
+                                <option value="lexend">Lexend (Lecture fluide)</option>
+                            </select>
+                        </div>
+
+                        <!-- Taille & Interligne -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Taille (pt)</label>
+                                <div class="flex items-center">
+                                    <input type="number" id="fontSizeInput" min="12" max="24" value="14" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-aru-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Interligne</label>
+                                <select id="lineSpacingSelect" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-lg p-2.5 focus:ring-2 focus:ring-aru-500">
+                                    <option value="1.2">1.2 (Standard)</option>
+                                    <option value="1.5" selected>1.5 (Norme ARU)</option>
+                                    <option value="1.8">1.8 (Très aéré)</option>
+                                    <option value="2.0">2.0 (Double)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Couleur / Confort Visuel -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Fond de lecture (Anti-éblouissement)</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <button data-bg="white" class="bg-btn-bg border-2 border-aru-600 h-9 rounded-lg bg-white flex items-center justify-center text-xs font-medium text-slate-700 shadow-sm">Blanc</button>
+                                <button data-bg="cream" class="bg-btn-bg border border-slate-200 h-9 rounded-lg bg-amber-50 hover:border-amber-400 flex items-center justify-center text-xs font-medium text-amber-900">Crème</button>
+                                <button data-bg="yellow" class="bg-btn-bg border border-slate-200 h-9 rounded-lg bg-yellow-100 hover:border-yellow-400 flex items-center justify-center text-xs font-medium text-yellow-900">Jaune</button>
+                                <button data-bg="blue" class="bg-btn-bg border border-slate-200 h-9 rounded-lg bg-sky-100 hover:border-sky-400 flex items-center justify-center text-xs font-medium text-sky-900">Ciel</button>
+                            </div>
+                        </div>
+
+                        <!-- Aménagement des zones de réponse -->
+                        <div class="pt-2 border-t border-slate-100">
+                            <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Espace de réponse pour l'élève</label>
+                            
+                            <div class="space-y-2">
+                                <label class="flex items-center space-x-3 cursor-pointer">
+                                    <input type="checkbox" id="chkExpandAnswers" checked class="w-4 h-4 text-aru-600 rounded border-slate-300 focus:ring-aru-500">
+                                    <span class="text-sm font-medium text-slate-700">Agrandir les zones de réponse</span>
+                                </label>
+                                <p class="text-xs text-slate-500 pl-7">Insère automatiquement des lignes aérées sous les consignes et questions.</p>
+
+                                <div id="responseOptions" class="pl-7 pt-2 flex items-center space-x-3">
+                                    <span class="text-xs text-slate-600">Lignes à ajouter :</span>
+                                    <select id="responseLinesCount" class="bg-slate-50 border border-slate-300 text-xs rounded p-1">
+                                        <option value="2">2 lignes</option>
+                                        <option value="3" selected>3 lignes</option>
+                                        <option value="5">5 lignes</option>
+                                        <option value="box">Zone encadrée</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Zone Exporter / Génération avec Cases à cocher -->
+                <div class="mt-6 pt-4 border-t border-slate-200">
+                    <h2 class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-3">
+                        3. Options d'exportation
+                    </h2>
+
+                    <div class="flex items-center justify-between mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="chkExportDocx" checked class="w-4 h-4 text-aru-600 rounded border-slate-300">
+                            <span class="text-sm font-medium text-slate-700"><i class="fa-regular fa-file-word text-blue-600 mr-1"></i> Word (.docx)</span>
+                        </label>
+
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="chkExportPdf" checked class="w-4 h-4 text-aru-600 rounded border-slate-300">
+                            <span class="text-sm font-medium text-slate-700"><i class="fa-regular fa-file-pdf text-red-600 mr-1"></i> PDF (.pdf)</span>
+                        </label>
+                    </div>
+
+                    <button id="btnExport" class="w-full bg-aru-600 hover:bg-aru-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center space-x-2 text-sm">
+                        <i class="fa-solid fa-download"></i>
+                        <span>Exporter les documents adaptés</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- COLONNE DROITE: Éditeur / Aperçu ARU (7 colonnes sur large écran) -->
+        <section class="lg:col-span-7 flex flex-col h-full min-h-[500px]">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex-1 flex flex-col overflow-hidden">
+                
+                <!-- Barre d'outils de l'éditeur -->
+                <div class="bg-slate-100/80 px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Aperçu conforme ARU</span>
+                        <span class="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full">Temps Réel</span>
+                    </div>
+
+                    <!-- Boutons d'édition rapide de texte -->
+                    <div class="flex items-center space-x-1">
+                        <button id="btnAddResponseBlock" class="text-xs bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-2.5 py-1 rounded-md shadow-sm transition flex items-center" title="Insérer manuellement un espace de réponse à la position du curseur">
+                            <i class="fa-solid fa-plus text-aru-600 mr-1"></i> Zone de réponse
+                        </button>
+                        <button id="btnResetText" class="text-xs text-slate-500 hover:text-red-600 px-2 py-1 rounded transition" title="Effacer tout">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Zone interactive d'édition/aperçu -->
+                <div class="p-4 sm:p-6 flex-1 overflow-y-auto bg-slate-50/50 flex justify-center">
+                    <!-- Document ARU Éditable -->
+                    <div id="aruDocument" contenteditable="true" class="w-full max-w-2xl bg-white p-6 sm:p-10 rounded-xl shadow-md border border-slate-200 aru-preview min-h-[600px] outline-none transition-all duration-200">
+                        <h2 style="font-size: 1.3em; font-weight: bold; margin-bottom: 1rem;">Consignes de l'évaluation</h2>
+                        <p>1. Lisez attentivement le texte ci-dessous puis répondez aux questions.</p>
+                        <p style="margin-top: 1rem;">Le système solaire est composé du Soleil et de l'ensemble des objets célestes gravitant autour de lui : les huit planètes, leurs satellites, les planètes naines et les petits corps.</p>
+                        
+                        <p style="margin-top: 1.5rem; font-weight: bold;">Question 1 : Quelle est l'étoile située au centre de notre système solaire ?</p>
+                        <!-- La zone de réponse sera auto-injectée si activée -->
+
+                        <p style="margin-top: 1.5rem; font-weight: bold;">Question 2 : Citez deux planètes qui composent le système solaire.</p>
+                    </div>
+                </div>
+
+                <!-- Footer d'information de conformité -->
+                <div class="px-4 py-2 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex justify-between items-center">
+                    <span id="charCount"><i class="fa-regular fa-keyboard mr-1"></i> 320 caractères</span>
+                    <span><i class="fa-solid fa-check-double text-green-600 mr-1"></i> Norme typo Arial 14pt + Interligne 1.5</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL 1: Guide Application Mobile iOS / Android -->
+    <div id="mobileModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-aru-100 text-aru-600 rounded-xl flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-mobile-screen"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Déploiement sur iOS & Android</h3>
+                        <p class="text-xs text-slate-500">Comment transformer cet outil web en application native mobile</p>
+                    </div>
+                </div>
+                <button class="closeModal text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <div class="space-y-4 text-sm text-slate-600">
+                <div class="p-4 bg-sky-50 rounded-xl border border-sky-100">
+                    <h4 class="font-bold text-sky-900 mb-1"><i class="fa-solid fa-bolt mr-1"></i> Solution 1 : Progressive Web App (PWA) - Instantané</h4>
+                    <p class="text-xs text-sky-800">
+                        Cette application est 100% responsive et optimisée tactile. Vous pouvez l'ajouter directement sur l'écran d'accueil de votre iPhone/iPad ou Android via Safari/Chrome ("Ajouter à l'écran d'accueil") pour une utilisation hors-ligne.
+                    </p>
+                </div>
+
+                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-1"><i class="fa-brands fa-react mr-1 text-sky-500"></i> Solution 2 : React Native / Expo (Application App Store / Play Store)</h4>
+                    <p class="text-xs text-slate-600 mb-2">
+                        Pour publier directement sur l'App Store iOS et Google Play Store avec accès à la caméra du téléphone pour scanner les feuilles de cours instantanément :
+                    </p>
+                    <ul class="list-disc pl-5 text-xs space-y-1">
+                        <li><strong>Scan Caméra :</strong> Intégration de <code>react-native-document-scanner-plugin</code> pour recadrer automatiquement les documents.</li>
+                        <li><strong>Moteur OCR Native :</strong> Utilisation de <code>MLKit OCR (Google)</code> ou iOS Vision Framework pour une extraction ultra-rapide sans serveur.</li>
+                    </ul>
+                </div>
+
+                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 class="font-bold text-slate-800 mb-1"><i class="fa-solid fa-box-archive mr-1 text-emerald-600"></i> Solution 3 : CapacitorJS (Wrap Hybride)</h4>
+                    <p class="text-xs text-slate-600">
+                        Encapsulez ce code HTML/JS directement dans un projet Capacitor avec la commande <code>npx cap add ios</code> / <code>android</code> pour obtenir un fichier `.ipa` et `.apk` prêt en quelques minutes.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6 text-right">
+                <button class="closeModal bg-slate-800 hover:bg-slate-900 text-white font-medium px-5 py-2 rounded-xl text-sm transition">
+                    Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Éléments DOM
+            const aruDocument = document.getElementById('aruDocument');
+            const fontSelect = document.getElementById('fontSelect');
+            const fontSizeInput = document.getElementById('fontSizeInput');
+            const lineSpacingSelect = document.getElementById('lineSpacingSelect');
+            const chkExpandAnswers = document.getElementById('chkExpandAnswers');
+            const responseLinesCount = document.getElementById('responseLinesCount');
+            const bgButtons = document.querySelectorAll('.bg-btn-bg');
+            const fileInput = document.getElementById('fileInput');
+            const dropZone = document.getElementById('dropZone');
+            const statusContainer = document.getElementById('statusContainer');
+            const statusText = document.getElementById('statusText');
+            const btnExport = document.getElementById('btnExport');
+            const chkExportDocx = document.getElementById('chkExportDocx');
+            const chkExportPdf = document.getElementById('chkExportPdf');
+            const charCount = document.getElementById('charCount');
+
+            // --- 1. GESTION DES OPTIONS D'AFFICHAGE ET ARU ---
+
+            // Changement de Police
+            fontSelect.addEventListener('change', (e) => {
+                const font = e.target.value;
+                aruDocument.classList.remove('font-arial', 'font-opendyslexic', 'font-verdana', 'font-lexend');
+                
+                if (font === 'arial') aruDocument.style.fontFamily = 'Arial, Helvetica, sans-serif';
+                else if (font === 'dyslexic') aruDocument.style.fontFamily = 'Atkinson Hyperlegible, sans-serif';
+                else if (font === 'verdana') aruDocument.style.fontFamily = 'Verdana, Geneva, sans-serif';
+                else if (font === 'lexend') aruDocument.style.fontFamily = 'Lexend, sans-serif';
+            });
+
+            // Changement de Taille de Police
+            fontSizeInput.addEventListener('input', (e) => {
+                const size = e.target.value || 14;
+                aruDocument.style.fontSize = `${size}pt`;
+            });
+
+            // Changement d'Interligne
+            lineSpacingSelect.addEventListener('change', (e) => {
+                aruDocument.style.lineHeight = e.target.value;
+            });
+
+            // Couleurs de Fond pour Confort Visuel
+            bgButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    bgButtons.forEach(b => b.classList.remove('border-2', 'border-aru-600'));
+                    btn.classList.add('border-2', 'border-aru-600');
+
+                    const bg = btn.dataset.bg;
+                    aruDocument.style.backgroundColor = 
+                        bg === 'cream' ? '#fbf9f1' :
+                        bg === 'yellow' ? '#fef9c3' :
+                        bg === 'blue' ? '#e0f2fe' : '#ffffff';
+                });
+            });
+
+            // --- 2. ESPACES DE RÉPONSE ET AMÉNAGEMENTS ---
+
+            // Injection automatique des espaces de réponse après chaque question
+            function applyAnswerSpaces() {
+                if (!chkExpandAnswers.checked) {
+                    // Supprimer les lignes créées
+                    const lines = aruDocument.querySelectorAll('.aru-response-line, .aru-response-box');
+                    lines.forEach(l => l.remove());
+                    return;
+                }
+
+                // Parcourir tous les paragraphes
+                const paragraphs = Array.from(aruDocument.querySelectorAll('p, div'));
+                const lineType = responseLinesCount.value;
+
+                paragraphs.forEach(p => {
+                    const text = p.innerText.trim();
+                    // Détection des questions (se termine par ? ou contient "Question")
+                    const isQuestion = text.endsWith('?') || /question\s*\d+/i.test(text) || /exercice\s*\d+/i.test(text);
+
+                    if (isQuestion && !p.nextElementSibling?.classList.contains('aru-response-line') && !p.nextElementSibling?.classList.contains('aru-response-box')) {
+                        if (lineType === 'box') {
+                            const box = document.createElement('div');
+                            box.className = 'aru-response-box';
+                            box.setAttribute('contenteditable', 'false');
+                            box.innerHTML = '<span style="color:#94a3b8; font-size:11pt; font-style:italic;">[ Zone de réponse aérée pour l\'élève ]</span>';
+                            p.after(box);
+                        } else {
+                            const count = parseInt(lineType) || 3;
+                            const container = document.createElement('div');
+                            container.className = 'aru-response-container';
+                            for (let i = 0; i < count; i++) {
+                                const line = document.createElement('span');
+                                line.className = 'aru-response-line';
+                                container.appendChild(line);
+                            }
+                            p.after(container);
+                        }
+                    }
+                });
+            }
+
+            chkExpandAnswers.addEventListener('change', applyAnswerSpaces);
+            responseLinesCount.addEventListener('change', () => {
+                // Réinitialiser puis réappliquer
+                document.querySelectorAll('.aru-response-container, .aru-response-box').forEach(el => el.remove());
+                applyAnswerSpaces();
+            });
+
+            // Insérer une zone manuellement à la position actuelle
+            document.getElementById('btnAddResponseBlock').addEventListener('click', () => {
+                const box = document.createElement('div');
+                box.className = 'aru-response-box';
+                box.innerHTML = '<span style="color:#94a3b8; font-size:11pt; font-style:italic;">[ Zone de réponse ]</span>';
+                aruDocument.appendChild(box);
+            });
+
+            // --- 3. EXTRACTION DE FICHIERS (Word, PDF, Images via OCR) ---
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-aru-500', 'bg-sky-50');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-aru-500', 'bg-sky-50');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-aru-500', 'bg-sky-50');
+                if (e.dataTransfer.files.length) {
+                    handleFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+
+            function showStatus(msg) {
+                statusContainer.classList.remove('hidden');
+                statusText.innerText = msg;
+            }
+
+            function hideStatus() {
+                statusContainer.classList.add('hidden');
+            }
+
+            async function handleFile(file) {
+                const fileType = file.name.split('.').pop().toLowerCase();
+                showStatus(`Lecture de "${file.name}"...`);
+
+                try {
+                    if (fileType === 'docx') {
+                        // Traitement Word avec Mammoth
+                        const arrayBuffer = await file.arrayBuffer();
+                        const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+                        aruDocument.innerHTML = result.value || "<p>Document vide.</p>";
+                        hideStatus();
+                        applyAnswerSpaces();
+                    } else if (fileType === 'pdf') {
+                        // Traitement PDF via PDF.js
+                        showStatus("Extraction du texte du fichier PDF...");
+                        const arrayBuffer = await file.arrayBuffer();
+                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        let textHtml = '';
+
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const content = await page.getTextContent();
+                            const pageStrings = content.items.map(item => item.str);
+                            textHtml += `<p style="margin-bottom:1rem;">${pageStrings.join(' ')}</p>`;
+                        }
+
+                        aruDocument.innerHTML = textHtml || "<p>Aucun texte extractible trouvé dans le PDF.</p>";
+                        hideStatus();
+                        applyAnswerSpaces();
+                    } else if (['jpg', 'jpeg', 'png'].includes(fileType)) {
+                        // Traitement Image via OCR Tesseract.js
+                        showStatus("Analyse de l'image (OCR Tesseract) en cours...");
+                        const worker = await Tesseract.createWorker('fra');
+                        const ret = await worker.recognize(file);
+                        await worker.terminate();
+
+                        const formattedText = ret.data.text.split('\n').filter(line => line.trim() !== '').map(l => `<p>${l}</p>`).join('');
+                        aruDocument.innerHTML = formattedText || "<p>Aucun texte détecté dans l'image.</p>";
+                        hideStatus();
+                        applyAnswerSpaces();
+                    } else {
+                        alert("Format non pris en charge. Veuillez fournir un fichier .docx, .pdf, .png ou .jpg.");
+                        hideStatus();
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Erreur lors de la lecture du fichier : " + err.message);
+                    hideStatus();
+                }
+                updateCharCount();
+            }
+
+            // Démos
+            document.getElementById('btnDemoExercise').addEventListener('click', () => {
+                aruDocument.innerHTML = `
+                    <h2 style="font-size: 1.3em; font-weight: bold; margin-bottom: 1rem;">Évaluation de Français - La Phrase Complexe</h2>
+                    <p style="font-weight: bold; margin-top: 1rem;">Consigne :</p>
+                    <p>Reliez les propositions et identifiez les propositions subordonnées.</p>
+                    
+                    <p style="margin-top: 1.5rem; font-weight: bold;">Question 1 : Complétez la phrase suivante avec une proposition relative : "Le livre..."</p>
+                    
+                    <p style="margin-top: 1.5rem; font-weight: bold;">Question 2 : Transformez cette phrase simple en phrase complexe.</p>
+                `;
+                applyAnswerSpaces();
+                updateCharCount();
+            });
+
+            document.getElementById('btnDemoText').addEventListener('click', () => {
+                aruDocument.innerHTML = `
+                    <h2 style="font-size: 1.3em; font-weight: bold; margin-bottom: 1rem;">Histoire - La Révolution Industrielle</h2>
+                    <p style="margin-bottom: 1rem;">Au XIXe siècle, l'invention de la machine à vapeur par James Watt a profondément transformé le travail et les transports.</p>
+                    <p style="margin-bottom: 1rem;">Les usines se développent rapidement près des mines de charbon. La population rurale quitte les campagnes pour venir travailler en ville : c'est l'exode rural.</p>
+                    <p style="margin-top: 1.5rem; font-weight: bold;">Question : Quels sont les deux facteurs ayant favorisé le développement des usines ?</p>
+                `;
+                applyAnswerSpaces();
+                updateCharCount();
+            });
+
+            document.getElementById('btnResetText').addEventListener('click', () => {
+                if(confirm("Voulez-vous réinitialiser le texte ?")) {
+                    aruDocument.innerHTML = "<p>Tapez ou collez votre texte ici...</p>";
+                    updateCharCount();
+                }
+            });
+
+            function updateCharCount() {
+                const count = aruDocument.innerText.length;
+                charCount.innerHTML = `<i class="fa-regular fa-keyboard mr-1"></i> ${count} caractères`;
+            }
+            aruDocument.addEventListener('input', updateCharCount);
+
+            // --- 4. EXPORTATION DES DOCUMENTS (.docx & .pdf) ---
+
+            btnExport.addEventListener('click', async () => {
+                const exportDocx = chkExportDocx.checked;
+                const exportPdf = chkExportPdf.checked;
+
+                if (!exportDocx && !exportPdf) {
+                    alert("Veuillez cocher au moins une option d'exportation (Word ou PDF).");
+                    return;
+                }
+
+                btnExport.disabled = true;
+                btnExport.innerHTML = `<i class="fa-solid fa-spinner animate-spin mr-2"></i> Génération des fichiers...`;
+
+                try {
+                    // Export Word (.docx) avec docx.js
+                    if (exportDocx) {
+                        await exportToWord();
+                    }
+
+                    // Export PDF via html2pdf
+                    if (exportPdf) {
+                        await exportToPDF();
+                    }
+                } catch (e) {
+                    console.error("Erreur Export:", e);
+                    alert("Erreur lors de la création des fichiers : " + e.message);
+                } finally {
+                    btnExport.disabled = false;
+                    btnExport.innerHTML = `<i class="fa-solid fa-download"></i> <span>Exporter les documents adaptés</span>`;
+                }
+            });
+
+            async function exportToWord() {
+                const { Document, Packer, Paragraph, TextRun, BorderStyle } = window.docx;
+
+                const paragraphs = Array.from(aruDocument.children);
+                const docChildren = [];
+
+                paragraphs.forEach(node => {
+                    const text = node.innerText || '';
+                    const isHeader = node.tagName === 'H1' || node.tagName === 'H2';
+
+                    if (node.classList.contains('aru-response-container')) {
+                        // Lignes de réponse Word
+                        const lineCount = node.children.length;
+                        for(let i=0; i<lineCount; i++) {
+                            docChildren.push(new Paragraph({
+                                border: { bottom: { color: "94A3B8", space: 1, value: BorderStyle.DASHED, size: 6 } },
+                                spacing: { after: 200, before: 200 }
+                            }));
+                        }
+                    } else if (node.classList.contains('aru-response-box')) {
+                        // Cadre de réponse
+                        docChildren.push(new Paragraph({
+                            text: "[ Zone réservée aux réponses de l'élève ]",
+                            border: {
+                                top: { color: "CBD5E1", value: BorderStyle.SINGLE, size: 6 },
+                                bottom: { color: "CBD5E1", value: BorderStyle.SINGLE, size: 6 },
+                                left: { color: "CBD5E1", value: BorderStyle.SINGLE, size: 6 },
+                                right: { color: "CBD5E1", value: BorderStyle.SINGLE, size: 6 },
+                            },
+                            spacing: { before: 200, after: 200 }
+                        }));
+                    } else if (text.trim() !== '') {
+                        docChildren.push(new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: text,
+                                    size: parseInt(fontSizeInput.value) * 2, // docx utilise demi-points (14pt = 28)
+                                    font: "Arial",
+                                    bold: isHeader || node.style.fontWeight === 'bold'
+                                })
+                            ],
+                            spacing: { line: 360, after: 200 } // Interligne 1.5 (240 * 1.5)
+                        }));
+                    }
+                });
+
+                const doc = new Document({
+                    sections: [{
+                        properties: {},
+                        children: docChildren
+                    }]
+                });
+
+                const blob = await Packer.toBlob(doc);
+                saveAs(blob, "Document_Adapte_ARU.docx");
+            }
+
+            async function exportToPDF() {
+                const element = aruDocument;
+                const opt = {
+                    margin:       15,
+                    filename:     'Document_Adapte_ARU.pdf',
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2 },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                await html2pdf().set(opt).from(element).save();
+            }
+
+            // Modal Mobile & Aide
+            const mobileModal = document.getElementById('mobileModal');
+            document.getElementById('btnMobileGuide').addEventListener('click', () => {
+                mobileModal.classList.remove('hidden');
+            });
+            document.querySelectorAll('.closeModal').forEach(b => {
+                b.addEventListener('click', () => mobileModal.classList.add('hidden'));
+            });
+
+            // Initialiser les espaces de réponses sur l'exemple par défaut
+            applyAnswerSpaces();
+        });
+    </script>
+</body>
+</html>
