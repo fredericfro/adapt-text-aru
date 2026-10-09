@@ -169,6 +169,44 @@
             background-color: #0284c7;
             color: white;
         }
+
+        /* Styles spécifiques pour l'impression natif et export PDF */
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            body * {
+                visibility: hidden;
+            }
+            #editor-section, #editor-section *, #aruEditor, #aruEditor * {
+                visibility: visible;
+            }
+            #editor-section {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+            header, main > section:not(#editor-section), main > div, footer, #apiKeyModal, #toastContainer, button, .bg-slate-100, .bg-slate-50 {
+                display: none !important;
+            }
+            .aru-content {
+                font-family: Arial, Helvetica, sans-serif !important;
+                font-size: 14pt !important;
+                line-height: 1.5 !important;
+                color: #000000 !important;
+            }
+            .aru-answer-space {
+                border: 2px dashed #64748b !important;
+                background-color: #ffffff !important;
+                page-break-inside: avoid;
+            }
+        }
     </style>
 </head>
 <body class="h-full flex flex-col min-h-screen text-slate-800 bg-slate-50">
@@ -356,6 +394,9 @@
                 <div class="pt-2 flex justify-end gap-3">
                     <button onclick="clearEditor()" class="px-4 py-2 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition">
                         <i class="fa-solid fa-trash"></i> Effacer tout
+                    </button>
+                    <button onclick="printNativePdf()" class="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-800 text-white font-medium rounded-lg transition flex items-center gap-1.5" title="Ouvrir la boîte d'impression native du navigateur">
+                        <i class="fa-solid fa-print"></i> Imprimer / PDF Natif
                     </button>
                     <button onclick="exportSelectedFormats()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2 text-sm">
                         <i class="fa-solid fa-download"></i> Télécharger les fichiers adaptés
@@ -969,66 +1010,66 @@
                                 }
                             },
                             children: docChildren.length > 0 ? docChildren : [
-                                new Paragraph({
-                                    children: [new TextRun({ text: tempDiv.textContent || "", font: "Arial", size: 28 })]
-                                })
-                            ]
-                        }]
-                    });
+        // Export PDF via html2pdf.js avec fallback natif
+        async function exportToPdf() {
+            const htmlContent = aruEditor.innerHTML;
+            if (!htmlContent || htmlContent.includes("Le document transformé apparaîtra ici")) {
+                showToast("Aucun contenu à exporter en PDF.", "warning");
+                return;
+            }
 
-                    const blob = await Packer.toBlob(doc);
-                    saveAs(blob, "Document_Adapte_ARU.docx");
-                    showToast("Téléchargement du fichier Word (.docx) démarré.", "success");
+            try {
+                // Création d'un élément temporaire nettoyé et stylisé pour html2pdf
+                const tempContainer = document.createElement('div');
+                tempContainer.style.width = '750px';
+                tempContainer.style.padding = '25px';
+                tempContainer.style.backgroundColor = '#ffffff';
+                tempContainer.style.color = '#1e293b';
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.left = '-9999px';
+                tempContainer.style.top = '0';
+                tempContainer.className = 'aru-content';
+                tempContainer.innerHTML = htmlContent;
+
+                document.body.appendChild(tempContainer);
+
+                const opt = {
+                    margin:       [12, 12, 12, 12],
+                    filename:     'Document_Adapte_ARU.pdf',
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { 
+                        scale: 2, 
+                        useCORS: true, 
+                        logging: false,
+                        windowWidth: 800
+                    },
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+                };
+
+                if (typeof html2pdf !== 'undefined') {
+                    await html2pdf().set(opt).from(tempContainer).save();
+                    if (document.body.contains(tempContainer)) {
+                        document.body.removeChild(tempContainer);
+                    }
+                    showToast("Fichier PDF généré et téléchargé.", "success");
                 } else {
-                    exportToWordHtml(htmlContent);
+                    if (document.body.contains(tempContainer)) {
+                        document.body.removeChild(tempContainer);
+                    }
+                    printNativePdf();
                 }
 
             } catch (err) {
-                console.warn("Utilisation du fallback d'export Word :", err);
-                exportToWordHtml(htmlContent);
+                console.warn("Échec html2pdf, bascule vers l'impression native :", err);
+                showToast("Ouverture de la boîte d'impression native (Enregistrer au format PDF)...", "info");
+                printNativePdf();
             }
         }
 
-        function exportToWordHtml(htmlContent) {
-            const wordHeader = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-            <head><meta charset='utf-8'><title>Document ARU</title>
-            <style>
-                body { font-family: Arial, sans-serif !important; font-size: 14pt !important; line-height: 1.5 !important; color: #1e293b; }
-                h1 { font-size: 20pt !important; font-weight: bold !important; color: #0c4a6e; }
-                h2 { font-size: 17pt !important; font-weight: bold !important; color: #0369a1; }
-                h3 { font-size: 15pt !important; font-weight: bold !important; color: #0284c7; }
-                strong { font-weight: bold !important; background-color: #fef08a; }
-                .aru-answer-space { border: 2px dashed #94a3b8; padding: 20px; margin: 15px 0; min-height: 100px; background-color: #f8fafc; }
-                table { border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 13pt; }
-                th, td { border: 2px solid #0284c7; padding: 10px; text-align: left; }
-                th { background-color: #e0f2fe; font-weight: bold; }
-            </style>
-            </head><body>`;
-            const wordFooter = "</body></html>";
-            const fullContent = wordHeader + htmlContent + wordFooter;
-
-            const blob = new Blob(['\ufeff', fullContent], { type: 'application/msword' });
-            saveAs(blob, "Document_Adapte_ARU.doc");
-            showToast("Document téléchargé au format Word (.doc).", "success");
-        }
-
-        // Export PDF via html2pdf.js
-        async function exportToPdf() {
-            const element = aruEditor;
-            const opt = {
-                margin:       [15, 15, 15, 15],
-                filename:     'Document_Adapte_ARU.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-
-            try {
-                await html2pdf().set(opt).from(element).save();
-                showToast("Fichier PDF généré et téléchargé.", "success");
-            } catch (err) {
-                showToast("Erreur lors de la génération du PDF.", "error");
-            }
+        // Fonction d'impression native permettant d'enregistrer directement en PDF
+        function printNativePdf() {
+            window.print();
         }
 
         function openApiKeyModal() {
