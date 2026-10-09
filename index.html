@@ -177,10 +177,10 @@
                 color: black !important;
             }
             body * {
-                visibility: hidden;
+                visibility: hidden !important;
             }
             #editor-section, #editor-section *, #aruEditor, #aruEditor * {
-                visibility: visible;
+                visibility: visible !important;
             }
             #editor-section {
                 position: absolute !important;
@@ -191,6 +191,11 @@
                 padding: 0 !important;
                 border: none !important;
                 box-shadow: none !important;
+                background: white !important;
+            }
+            /* Masquer les en-têtes et barres d'outils de l'éditeur lors de l'impression */
+            #editor-section > div:not(.p-6) {
+                display: none !important;
             }
             header, main > section:not(#editor-section), main > div, footer, #apiKeyModal, #toastContainer, button, .bg-slate-100, .bg-slate-50 {
                 display: none !important;
@@ -1049,20 +1054,25 @@
                 return;
             }
 
-            try {
-                // Création d'un élément temporaire nettoyé et stylisé pour html2pdf
-                const tempContainer = document.createElement('div');
-                tempContainer.style.width = '750px';
-                tempContainer.style.padding = '25px';
-                tempContainer.style.backgroundColor = '#ffffff';
-                tempContainer.style.color = '#1e293b';
-                tempContainer.style.position = 'absolute';
-                tempContainer.style.left = '-9999px';
-                tempContainer.style.top = '0';
-                tempContainer.className = 'aru-content';
-                tempContainer.innerHTML = htmlContent;
+            showToast("Génération du fichier PDF en cours...", "info");
 
-                document.body.appendChild(tempContainer);
+            try {
+                // Création d'un élément temporaire positionné en fixed (rendu DOM valide pour html2canvas)
+                const printWrapper = document.createElement('div');
+                printWrapper.id = 'pdf-export-temp-wrapper';
+                printWrapper.style.position = 'fixed';
+                printWrapper.style.top = '0';
+                printWrapper.style.left = '0';
+                printWrapper.style.width = '794px'; // Format A4 standard à 96 DPI
+                printWrapper.style.zIndex = '-9999';
+                printWrapper.style.opacity = '0.99';
+                printWrapper.style.backgroundColor = '#ffffff';
+                printWrapper.style.padding = '30px';
+                printWrapper.style.boxSizing = 'border-box';
+                printWrapper.className = 'aru-content';
+                printWrapper.innerHTML = htmlContent;
+
+                document.body.appendChild(printWrapper);
 
                 const opt = {
                     margin:       [12, 12, 12, 12],
@@ -1072,6 +1082,8 @@
                         scale: 2, 
                         useCORS: true, 
                         logging: false,
+                        scrollX: 0,
+                        scrollY: 0,
                         windowWidth: 800
                     },
                     jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -1079,22 +1091,24 @@
                 };
 
                 if (typeof html2pdf !== 'undefined') {
-                    await html2pdf().set(opt).from(tempContainer).save();
-                    if (document.body.contains(tempContainer)) {
-                        document.body.removeChild(tempContainer);
+                    await html2pdf().set(opt).from(printWrapper).save();
+                    if (document.body.contains(printWrapper)) {
+                        document.body.removeChild(printWrapper);
                     }
-                    showToast("Fichier PDF généré et téléchargé.", "success");
+                    showToast("Fichier PDF généré et téléchargé avec succès !", "success");
                 } else {
-                    if (document.body.contains(tempContainer)) {
-                        document.body.removeChild(tempContainer);
-                    }
-                    printNativePdf();
+                    throw new Error("Bibliothèque html2pdf introuvable.");
                 }
 
             } catch (err) {
                 console.warn("Échec html2pdf, bascule vers l'impression native :", err);
-                showToast("Ouverture de la boîte d'impression native (Enregistrer au format PDF)...", "info");
-                printNativePdf();
+                const temp = document.getElementById('pdf-export-temp-wrapper');
+                if (temp) temp.remove();
+
+                showToast("Ouverture de la fenêtre d'impression (sélectionnez 'Enregistrer au format PDF')...", "info");
+                setTimeout(() => {
+                    printNativePdf();
+                }, 400);
             }
         }
 
