@@ -282,7 +282,7 @@
             <!-- Onglet 1 : Zone de dépôt de fichiers révisée -->
             <div id="fileImportZone">
                 <div id="dropzone" class="border-2 border-dashed border-slate-300 bg-slate-50 hover:border-aru-500 hover:bg-aru-50/50 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 relative">
-                    <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.heic,.heif,.txt" multiple>
+                    <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.doc,.png,.PNG,.jpg,.jpeg,.heic,.heif,.txt" multiple>
                     
                     <div class="space-y-4 pointer-events-none">
                         <div class="w-16 h-16 bg-white shadow-sm rounded-full flex items-center justify-center mx-auto text-aru-600 border border-slate-100">
@@ -290,7 +290,7 @@
                         </div>
                         <div>
                             <p class="text-base font-semibold text-slate-700">Déposez vos documents ici ou <span class="text-aru-600 underline">cliquez pour parcourir</span></p>
-                            <p class="text-xs text-slate-500 mt-1">Word (.docx), PDF, Images (PNG, JPG, HEIC, Captures), Notes manuscrites, Textes</p>
+                            <p class="text-xs text-slate-500 mt-1">Word (.docx), PDF, Images (<strong>PNG</strong>, JPG, HEIC, Captures d'écran), Notes manuscrites, Textes</p>
                         </div>
                     </div>
                 </div>
@@ -718,7 +718,7 @@
                         aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + pdfHtml;
 
                     } else if (['png', 'jpg', 'jpeg', 'heic', 'heif'].includes(ext)) {
-                        // Images / HEIC / Manuscrits
+                        // Images / PNG / HEIC / Manuscrits
                         let fileToProcess = file;
                         if (['heic', 'heif'].includes(ext)) {
                             updateProgress(percent, "Conversion de l'image HEIC...", "Décodage du format photo...");
@@ -729,11 +729,19 @@
                         if (customApiKey) {
                             // OCR via Gemini Vision
                             const base64 = await fileToBase64(fileToProcess);
-                            const visionResult = await callGeminiVision(base64, fileToProcess.type || "image/jpeg");
-                            aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + visionResult;
+                            try {
+                                const visionResult = await callGeminiVision(base64, fileToProcess.type || "image/jpeg");
+                                aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + visionResult;
+                            } catch (geminiErr) {
+                                console.warn("Basculement sur l'OCR local...", geminiErr);
+                                showToast("OCR API indisponible, utilisation du moteur OCR local.", "warning");
+                                const localOcrText = await runLocalOcr(fileToProcess);
+                                const formattedOcr = applyLocalAruFormatting(localOcrText);
+                                aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + formattedOcr;
+                            }
                         } else {
-                            // OCR 100% Local via Tesseract.js
-                            updateProgress(percent, "OCR Local en cours...", "Reconnaissance de texte sur l'image...");
+                            // OCR 100% Local via Tesseract.js avec pré-traitement HD & Fond blanc
+                            updateProgress(percent, "OCR Local en cours...", "Optimisation et reconnaissance du texte français...");
                             const localOcrText = await runLocalOcr(fileToProcess);
                             const formattedOcr = applyLocalAruFormatting(localOcrText);
                             aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + formattedOcr;
@@ -774,32 +782,120 @@
                 if (pageText.length > 20) {
                     fullText += `<p>${pageText}</p>`;
                 } else {
-                    // Si la page est une image scannée, faire un rendu Canvas et OCR
-                    const viewport = page.getViewport({ scale: 1.5 });
+                    // Si la page est une image scannée, faire un rendu Canvas haute définition et OCR
+                    const viewport = page.getViewport({ scale: 2.5 });
                     const canvas = document.createElement('canvas');
                     const context = canvas.getContext('2d');
                     canvas.height = viewport.height;
                     canvas.width = viewport.width;
 
+                    context.fillStyle = "#FFFFFF";
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+
                     await page.render({ canvasContext: context, viewport: viewport }).promise;
-                    const pageImageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+                    const pageImageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
                     
                     const ocrPageText = await runLocalOcr(pageImageBlob);
                     fullText += `<p>${ocrPageText}</p>`;
                 }
             }
 
-            return fullText || "<p>Aucun texte pu être extrait du PDF.</p>";
+            return fullText || "<p>Aucun texte n'a pu être extrait du PDF.</p>";
         }
 
-        /* OCR local dans le navigateur via Tesseract.js */
+        /* Pré-traitement d'image (PNG, JPG, Captures) pour éliminer le bruit et les transparences */
+        async function preprocessImageForOcr(imageSource) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                
+                const src = (imageSource instanceof File || imageSource instanceof Blob) 
+                    ? URL.createObjectURL(imageSource) 
+                    : imageSource;
+
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    // Augmentation de résolution pour lisibilité maximale des accents français
+                    let scale = 1;
+                    if (img.width < 1800) {
+                        scale = 1800 / img.width;
+                    }
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+
+                    // 1. FOND BLANC OBLIGATOIRE (Corrige le problème des PNG transparents et des captures)
+                    ctx.fillStyle = "#FFFFFF";
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // 2. Dessin de l'image
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    // 3. Rehaussement du contraste et passage en niveau de gris
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                        const contrastFactor = 1.25;
+                        let adjusted = (gray - 128) * contrastFactor + 128;
+                        adjusted = Math.min(255, Math.max(0, adjusted));
+                        
+                        data[i] = adjusted;
+                        data[i + 1] = adjusted;
+                        data[i + 2] = adjusted;
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+
+                    if (imageSource instanceof File || imageSource instanceof Blob) {
+                        URL.revokeObjectURL(src);
+                    }
+
+                    canvas.toBlob((blob) => {
+                        resolve(blob || imageSource);
+                    }, 'image/jpeg', 0.95);
+                };
+
+                img.onerror = () => {
+                    resolve(imageSource);
+                };
+
+                img.src = src;
+            });
+        }
+
+        /* OCR local dans le navigateur via Tesseract.js (Optimisé pour le Français) */
         async function runLocalOcr(imageSource) {
             try {
                 if (typeof Tesseract === 'undefined') {
                     throw new Error("Moteur OCR local non chargé.");
                 }
-                const result = await Tesseract.recognize(imageSource, 'fra');
-                return result?.data?.text || "Aucun texte détecté sur l'image.";
+
+                // Application du pré-traitement (fond blanc PNG + contraste HD)
+                const processedBlob = await preprocessImageForOcr(imageSource);
+
+                const result = await Tesseract.recognize(processedBlob, 'fra', {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            const pct = Math.round((m.progress || 0) * 100);
+                            updateProgress(null, null, `Reconnaissance du texte en français (${pct}%)...`);
+                        }
+                    }
+                });
+
+                let cleanedText = result?.data?.text || "";
+
+                // Nettoyage des artefacts de reconnaissance
+                cleanedText = cleanedText
+                    .replace(/[\r\n]{3,}/g, '\n\n')
+                    .replace(/[^\S\r\n]{2,}/g, ' ')
+                    .trim();
+
+                if (!cleanedText || cleanedText.length < 3) {
+                    return "Aucun texte lisible n'a été détecté sur l'image.";
+                }
+
+                return cleanedText;
             } catch (err) {
                 console.warn("Échec OCR Tesseract local:", err);
                 return "Erreur d'extraction OCR de l'image.";
@@ -828,11 +924,12 @@
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
             const promptSystem = `
-            Tu es un expert en orthopédagogie et Aménagements Raisonnables Universels (ARU).
-            Effectue un OCR précis de cette image/document et retourne du HTML bien structuré :
-            1. Consignes et Verbes : Mets IMPÉRATIVEMENT en GRAS (balise <strong>) tous les mots-clés et verbes d'action.
+            Tu es un expert en orthopédagogie et OCR en français pour les Aménagements Raisonnables Universels (ARU).
+            Transcris le texte de cette image (PNG/JPG/Document) de manière ultra-précise en français sans inventer de mots.
+            Effectue du HTML propre :
+            1. Consignes et Verbes d'action : Mets IMPÉRATIVEMENT en GRAS (balise <strong>).
             2. Structure : Utilise des titres <h1>, <h2>, <h3>.
-            3. Agrandissement réponses : Insère <div class="aru-answer-space"></div> là où il y a des lignes de réponse étables/pointillés.
+            3. Agrandissement réponses : Insère <div class="aru-answer-space"></div> là où il y a des lignes de réponse/pointillés.
             4. Interdiction absolue de couper les mots en fin de ligne.
             5. Renvoie UNIQUEMENT le code HTML propre sans balises markdown.
             `;
@@ -854,7 +951,7 @@
             });
 
             if (!response.ok) {
-                throw new Error("Échec de l'appel Gemini.");
+                throw new Error("Échec de l'appel Gemini Vision.");
             }
 
             const result = await response.json();
