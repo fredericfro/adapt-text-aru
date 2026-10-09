@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Adapt'Text ARU - Adaptation Facile de Documents Accessible</title>
+    <title>Adapt'Text ARU - Convertisseur Accessible & Export PDF/Word</title>
     
     <!-- Tailwind CSS pour un design responsive et moderne -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -26,33 +26,36 @@
             }
         }
     </script>
+    
     <!-- FontAwesome pour les icônes -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Libraries JS pour l'exportation et le traitement des fichiers -->
-    <!-- Utilisation du bundle UMD de docx.js pour éviter 'SyntaxError: Unexpected token export' dans le navigateur -->
+    <!-- Libraries JS externes -->
+    <!-- docx.js (bundle UMD) -->
     <script src="https://cdn.jsdelivr.net/npm/docx@8.2.2/build/index.umd.js"></script>
-    <!-- mammoth.js pour lire les fichiers Word importés -->
+    <!-- mammoth.js pour lire les fichiers Word -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-    <!-- pdf.js pour la conversion des PDF clients en images -->
+    <!-- pdf.js pour l'OCR des PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <!-- heic2any pour convertir les fichiers iPhone / HEIC -->
+    <!-- heic2any pour convertir le format iPhone HEIC -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
-    <!-- FileSaver pour faciliter les téléchargements -->
+    <!-- FileSaver pour les téléchargements -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- html2pdf.js pour la génération directe de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         body {
             font-family: Arial, sans-serif;
         }
 
-        /* Styles spécifiques aux normes ARU pour l'éditeur */
+        /* Normes de typographie et mise en page ARU */
         .aru-content {
             font-family: Arial, Helvetica, sans-serif !important;
             font-size: 14pt !important;
             line-height: 1.5 !important;
             color: #1e293b;
-            word-break: keep-all; /* Interdiction de couper les mots */
+            word-break: keep-all;
             overflow-wrap: break-word;
         }
 
@@ -91,19 +94,19 @@
         .aru-content strong {
             font-weight: 800 !important;
             color: #000000;
-            background-color: #fef08a; /* Surlignage léger pour la lisibilité */
+            background-color: #fef08a;
             padding: 0 2px;
             border-radius: 2px;
         }
 
-        /* Style des zones de réponses élargies */
+        /* Zones de réponse aérées */
         .aru-answer-space {
             background-color: #f8fafc;
             border: 2px dashed #94a3b8;
             border-radius: 8px;
             padding: 1.25rem;
             margin: 1rem 0;
-            min-height: 120px;
+            min-height: 110px;
             position: relative;
         }
 
@@ -117,7 +120,7 @@
             font-style: italic;
         }
 
-        /* Tableaux adaptés ARU */
+        /* Tableaux et images adaptés */
         .aru-content table {
             width: 100%;
             border-collapse: collapse;
@@ -145,7 +148,7 @@
             border: 1px solid #cbd5e1;
         }
 
-        /* Barre d'outils de l'éditeur */
+        /* Boutons d'outils de l'éditeur */
         .editor-btn {
             padding: 6px 12px;
             border-radius: 6px;
@@ -163,47 +166,28 @@
             color: #0f172a;
         }
 
-        .editor-btn.active {
-            background-color: #0284c7;
-            color: white;
-        }
-
-        /* Styles spécifiques pour l'impression natif et export PDF */
+        /* Impression propre */
         @media print {
             .no-print {
                 display: none !important;
             }
 
-            html, body {
+            body, html {
                 background: white !important;
                 color: black !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                height: auto !important;
-                min-height: 0 !important;
-                overflow: visible !important;
-            }
-
-            main {
-                max-width: 100% !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                width: 100% !important;
             }
 
             #editor-section {
                 border: none !important;
                 box-shadow: none !important;
-                border-radius: 0 !important;
                 background: white !important;
-                margin: 0 !important;
-                padding: 0 !important;
             }
 
             #aruEditor {
                 padding: 0 !important;
                 margin: 0 !important;
-                min-height: 0 !important;
                 box-shadow: none !important;
                 border: none !important;
                 font-family: Arial, Helvetica, sans-serif !important;
@@ -238,7 +222,6 @@
                 </div>
             </div>
 
-            <!-- Boutons d'action rapides et paramètres -->
             <div class="flex items-center gap-3">
                 <button id="apiKeyBtn" onclick="openApiKeyModal()" class="text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition">
                     <i class="fa-solid fa-key"></i> Clé API Gemini
@@ -253,27 +236,27 @@
 
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-        <!-- Banner d'information ARU -->
+        <!-- Bannière explicative ARU -->
         <div class="bg-gradient-to-r from-aru-900 to-aru-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden no-print">
             <div class="relative z-10 max-w-3xl">
-                <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider inline-block mb-2">Normes d'Accessibilité</span>
-                <h2 class="text-2xl font-bold mb-2">Transformez n'importe quel document en version ARU</h2>
+                <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider inline-block mb-2">Normes d'Accessibilité ARU</span>
+                <h2 class="text-2xl font-bold mb-2">Transformez vos documents en version accessible</h2>
                 <p class="text-slate-100 text-sm leading-relaxed mb-4">
-                    Importez des photos de cours, devoirs manuscrits, PDF, scans ou fichiers Word. L'Intelligence Artificielle retranscrit le texte, applique la typographie <strong>Arial 14pt (Interligne 1.5)</strong>, surligne les consignes et <strong>agrandit les espaces de réponses</strong> trop étroits.
+                    Importez un fichier Word, PDF, une image, un document manuscrit ou une photo iPhone (HEIC). L'IA extrait le texte, applique la typographie <strong>Arial 14pt (Interligne 1.5)</strong>, surligne les consignes en gras et <strong>agrandit les espaces de réponses</strong>.
                 </p>
                 <div class="flex flex-wrap gap-4 text-xs font-medium text-slate-200">
                     <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Mots-clés des consignes en gras</span>
-                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Conservation des tableaux & images</span>
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Maintien des tableaux & schémas</span>
                     <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Support Manuscrits & HEIC</span>
                     <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Sans coupure de mots</span>
                 </div>
             </div>
         </div>
 
-        <!-- ZONE D'IMPORTATION / DROPZONE -->
+        <!-- Zone de dépôt et sélection de fichier -->
         <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 no-print">
             <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <i class="fa-solid fa-file-import text-aru-600"></i> Step 1 : Importez votre document
+                <i class="fa-solid fa-file-import text-aru-600"></i> Étape 1 : Importez votre document
             </h3>
 
             <div id="dropzone" class="border-2 border-dashed border-slate-300 hover:border-aru-500 bg-slate-50 hover:bg-aru-50/50 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 relative">
@@ -285,24 +268,18 @@
                     </div>
                     <div>
                         <p class="text-base font-semibold text-slate-700">Déposez votre document ici ou <span class="text-aru-600 underline">parcourez vos fichiers</span></p>
-                        <p class="text-xs text-slate-500 mt-1">Formats pris en charge : PDF, Word (.docx), Images (PNG, JPG, HEIC, Captures), Notes manuscrites</p>
-                    </div>
-                    <div class="flex flex-wrap justify-center gap-2 pt-2">
-                        <span class="bg-white border border-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-md shadow-2xs">📄 PDF / Word</span>
-                        <span class="bg-white border border-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-md shadow-2xs">🖼️ Captures & Scans</span>
-                        <span class="bg-white border border-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-md shadow-2xs">✍️ Écriture Manuscrite</span>
-                        <span class="bg-white border border-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-md shadow-2xs">📱 Photos iPhone (HEIC)</span>
+                        <p class="text-xs text-slate-500 mt-1">PDF, Word (.docx), Images (PNG, JPG, HEIC, Captures), Notes manuscrites</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Liste des fichiers déposés -->
+            <!-- Liste des fichiers sélectionnés -->
             <div id="fileListContainer" class="hidden mt-4 space-y-2">
-                <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fichiers sélectionnés :</h4>
+                <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fichiers à traiter :</h4>
                 <div id="fileList" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
             </div>
 
-            <!-- Options de traitement -->
+            <!-- Options de mise en page -->
             <div class="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                 <label class="flex items-center space-x-2 cursor-pointer">
                     <input type="checkbox" id="optConsignes" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-4 h-4">
@@ -310,29 +287,29 @@
                 </label>
                 <label class="flex items-center space-x-2 cursor-pointer">
                     <input type="checkbox" id="optEspaces" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-4 h-4">
-                    <span class="text-slate-700 font-medium">Agrandir les zones de réponses (lignes courtes)</span>
+                    <span class="text-slate-700 font-medium">Agrandir les zones de réponse étroites</span>
                 </label>
                 <label class="flex items-center space-x-2 cursor-pointer">
                     <input type="checkbox" id="optKeepImages" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-4 h-4">
-                    <span class="text-slate-700 font-medium">Conserver illustrations & schémas</span>
+                    <span class="text-slate-700 font-medium">Conserver illustrations & tableaux</span>
                 </label>
             </div>
 
-            <!-- Bouton de lancement de conversion -->
+            <!-- Bouton de lancement -->
             <div class="mt-6 text-center">
                 <button id="processBtn" onclick="processDocuments()" disabled class="w-full sm:w-auto px-8 py-3.5 bg-aru-600 hover:bg-aru-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 mx-auto">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Transformer en document ARU
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Transformer le document au format ARU
                 </button>
             </div>
         </section>
 
-        <!-- INDICATEUR DE CHARGEMENT -->
+        <!-- Dynamic Loading Overlay -->
         <div id="loadingOverlay" class="hidden bg-white border border-aru-200 rounded-2xl p-8 text-center shadow-lg space-y-4 no-print">
             <div class="inline-block animate-spin text-aru-600 text-4xl">
                 <i class="fa-solid fa-circle-notch"></i>
             </div>
             <div>
-                <h4 id="loadingStatus" class="text-lg font-bold text-slate-800">Analyse du document par l'IA...</h4>
+                <h4 id="loadingStatus" class="text-lg font-bold text-slate-800">Analyse par l'Intelligence Artificielle...</h4>
                 <p id="loadingDetail" class="text-xs text-slate-500 mt-1">Extraction du texte, analyse des consignes et mise en page ARU en cours...</p>
             </div>
             <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden max-w-md mx-auto">
@@ -340,16 +317,15 @@
             </div>
         </div>
 
-        <!-- ZONE ÉDITEUR ET PREVIEW WYSIWYG -->
+        <!-- Zone Éditeur & Aperçu -->
         <section id="editor-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <!-- Header éditeur & Outils -->
             <div class="bg-slate-100 p-4 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4 no-print">
                 <div class="flex items-center gap-2">
-                    <span class="bg-aru-600 text-white text-xs px-2.5 py-1 rounded-md font-bold uppercase">Step 2</span>
-                    <h3 class="text-lg font-bold text-slate-800">Éditeur & Prévisualisation ARU</h3>
+                    <span class="bg-aru-600 text-white text-xs px-2.5 py-1 rounded-md font-bold uppercase">Étape 2</span>
+                    <h3 class="text-lg font-bold text-slate-800">Éditeur & Aperçu ARU</h3>
                 </div>
 
-                <!-- Boutons de formatage rapides -->
+                <!-- Barre d'outils de formatage -->
                 <div class="flex flex-wrap items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
                     <button onclick="formatText('bold')" class="editor-btn text-xs" title="Gras"><i class="fa-solid fa-bold"></i></button>
                     <button onclick="formatText('italic')" class="editor-btn text-xs" title="Italique"><i class="fa-solid fa-italic"></i></button>
@@ -358,39 +334,26 @@
                     <button onclick="formatText('insertUnorderedList')" class="editor-btn text-xs" title="Puces"><i class="fa-solid fa-list-ul"></i></button>
                     <button onclick="formatText('insertOrderedList')" class="editor-btn text-xs" title="Numérotation"><i class="fa-solid fa-list-ol"></i></button>
                     <div class="w-px h-4 bg-slate-200 mx-1"></div>
-                    <button onclick="insertAnswerBox()" class="editor-btn text-xs text-aru-700 bg-aru-50" title="Ajouter un espace de réponse"><i class="fa-solid fa-square-plus"></i> Espacement réponse</button>
+                    <button onclick="insertAnswerBox()" class="editor-btn text-xs text-aru-700 bg-aru-50" title="Ajouter une zone de réponse"><i class="fa-solid fa-square-plus"></i> Insérer espace de réponse</button>
                 </div>
             </div>
 
-            <!-- Indicateur des paramètres ARU forcés -->
-            <div class="bg-slate-50 px-4 py-2 border-b border-slate-200 text-xs text-slate-600 flex flex-wrap justify-between items-center gap-2 no-print">
-                <div class="flex items-center gap-4">
-                    <span><strong>Police :</strong> Arial (Universelle)</span>
-                    <span><strong>Taille :</strong> 14 pt</span>
-                    <span><strong>Interligne :</strong> 1.5</span>
-                    <span><strong>Alignement :</strong> Gauche (sans justification)</span>
-                </div>
-                <div class="text-slate-400 italic">
-                    <i class="fa-solid fa-info-circle"></i> Le texte reste entièrement modifiable avant l'exportation
-                </div>
-            </div>
-
-            <!-- Conteneur éditable WYSIWYG -->
+            <!-- Éditeur WYSIWYG -->
             <div class="p-6 md:p-10 min-h-[500px] bg-white overflow-y-auto">
                 <div id="aruEditor" contenteditable="true" class="aru-content outline-none focus:ring-1 focus:ring-aru-500 rounded-lg p-4 min-h-[450px]">
                     <p class="text-slate-400 italic text-center py-16">
-                        Le document transformé apparaîtra ici.<br>
-                        Vous pourrez relire le texte, corriger les éventuelles erreurs et vérifier la mise en page avant l'export.
+                        Le document transformé s'affichera ici.<br>
+                        Vous pourrez relire le texte, le modifier et vérifier la mise en page avant exportation.
                     </p>
                 </div>
             </div>
 
-            <!-- SECTION EXPORTATION -->
+            <!-- Section Exportation (PDF, DOCX, Impression) -->
             <div class="bg-slate-50 p-6 border-t border-slate-200 space-y-4 no-print">
                 <div class="flex items-center justify-between flex-wrap gap-4">
                     <div>
-                        <h4 class="text-sm font-bold text-slate-800">Step 3 : Exportation & Impression</h4>
-                        <p class="text-xs text-slate-500">Téléchargez votre document adapté au format Word (.docx) ou imprimez-le directement.</p>
+                        <h4 class="text-sm font-bold text-slate-800">Étape 3 : Exportation & Téléchargement</h4>
+                        <p class="text-xs text-slate-500">Téléchargez directement votre document adapté au format PDF ou Word (.docx).</p>
                     </div>
                 </div>
 
@@ -398,11 +361,14 @@
                     <button onclick="clearEditor()" class="px-4 py-2 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition">
                         <i class="fa-solid fa-trash"></i> Effacer tout
                     </button>
-                    <button onclick="printNativePdf()" class="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-800 text-white font-medium rounded-lg transition flex items-center gap-1.5" title="Ouvrir le menu d'impression du navigateur">
-                        <i class="fa-solid fa-print"></i> Imprimer le document
+                    <button onclick="printNativePdf()" class="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-800 text-white font-medium rounded-lg transition flex items-center gap-1.5" title="Imprimer ou enregistrer au format PDF via le navigateur">
+                        <i class="fa-solid fa-print"></i> Imprimer
+                    </button>
+                    <button onclick="exportToPdf()" class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-file-pdf text-lg"></i> Télécharger en PDF (.pdf)
                     </button>
                     <button onclick="exportDocxAction()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2 text-sm">
-                        <i class="fa-solid fa-file-word text-lg"></i> Télécharger au format Word (.docx)
+                        <i class="fa-solid fa-file-word text-lg"></i> Télécharger en Word (.docx)
                     </button>
                 </div>
             </div>
@@ -410,7 +376,7 @@
 
     </main>
 
-    <!-- MODAL CLÉ API GEMINI -->
+    <!-- Modal Clé API Gemini -->
     <div id="apiKeyModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -421,7 +387,7 @@
             </div>
             
             <p class="text-xs text-slate-600 leading-relaxed">
-                L'application utilise l'API Gemini 3.1 Flash pour effectuer l'OCR des manuscrits/scans et appliquer la mise en page ARU.
+                L'application utilise l'API Gemini 3.1 Flash pour réaliser l'OCR des manuscrits, PDF, scans et appliquer la mise en page ARU.
             </p>
 
             <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800 space-y-1.5">
@@ -429,9 +395,9 @@
                     <i class="fa-solid fa-circle-info text-blue-600"></i> Comment obtenir une clé API gratuite ?
                 </p>
                 <ol class="list-decimal list-inside space-y-1 text-[11px] text-blue-700">
-                    <li>Rendez-vous gratuitement sur <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="underline font-bold hover:text-blue-900">Google AI Studio <i class="fa-solid fa-up-right-from-square text-[9px]"></i></a>.</li>
+                    <li>Rendez-vous sur <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="underline font-bold hover:text-blue-900">Google AI Studio <i class="fa-solid fa-up-right-from-square text-[9px]"></i></a>.</li>
                     <li>Connectez-vous avec votre compte Google.</li>
-                    <li>Cliquez sur <strong>"Create API key"</strong> et copiez votre clé ci-dessous.</li>
+                    <li>Cliquez sur <strong>"Create API key"</strong> et collez la clé ci-dessous.</li>
                 </ol>
             </div>
 
@@ -451,7 +417,7 @@
                     <button onclick="testApiKey()" class="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg flex items-center gap-1">
                         <i class="fa-solid fa-vial"></i> Tester la clé
                     </button>
-                    <button onclick="clearApiKey()" class="px-2.5 py-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-lg flex items-center gap-1" title="Réinitialiser la clé">
+                    <button onclick="clearApiKey()" class="px-2.5 py-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-lg flex items-center gap-1" title="Réinitialiser">
                         <i class="fa-solid fa-rotate-left"></i>
                     </button>
                 </div>
@@ -463,18 +429,20 @@
         </div>
     </div>
 
-    <!-- CONTENEUR NOTIFICATIONS TOAST -->
+    <!-- Conteneur des Toasts -->
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none no-print"></div>
 
     <script>
         // PDF.js worker setup
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        if (typeof pdfjsLib !== 'undefined') {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        }
 
-        // Variables d'état globales
+        // Variables globales
         let loadedFiles = [];
         let customApiKey = localStorage.getItem('GEMINI_API_KEY') || "";
 
-        // Elements DOM
+        // Références DOM
         const dropzone = document.getElementById('dropzone');
         const fileInput = document.getElementById('fileInput');
         const fileList = document.getElementById('fileList');
@@ -522,10 +490,7 @@
 
             container.appendChild(toast);
 
-            setTimeout(() => {
-                toast.classList.remove('translate-y-2', 'opacity-0');
-            }, 10);
-
+            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
             setTimeout(() => {
                 if (toast.parentElement) {
                     toast.classList.add('opacity-0', 'translate-y-2');
@@ -539,21 +504,20 @@
             if (!dot) return;
             if (customApiKey && customApiKey.trim().length > 10) {
                 dot.className = 'w-2 h-2 rounded-full bg-emerald-500 inline-block';
-                dot.title = "Clé API Gemini personnalisée configurée";
+                dot.title = "Clé API Gemini configurée";
             } else {
                 dot.className = 'w-2 h-2 rounded-full bg-amber-400 inline-block';
-                dot.title = "Clé par défaut ou non définie";
+                dot.title = "Clé non configurée";
             }
         }
 
-        // Initialisation des événements au chargement
         window.addEventListener('DOMContentLoaded', () => {
             if (customApiKey) {
                 document.getElementById('apiKeyInput').value = customApiKey;
             }
             updateApiKeyStatusDot();
 
-            // Gestion du Drag & Drop
+            // Événements Dropzone
             dropzone.addEventListener('click', () => fileInput.click());
             
             dropzone.addEventListener('dragover', (e) => {
@@ -633,7 +597,7 @@
 
             loadingOverlay.classList.remove('hidden');
             processBtn.disabled = true;
-            updateProgress(10, "Préparation des fichiers...", "Conversion des images et extraction du contenu...");
+            updateProgress(10, "Préparation...", "Analyse et conversion des documents...");
 
             let combinedHtml = "";
 
@@ -641,7 +605,7 @@
                 for (let i = 0; i < loadedFiles.length; i++) {
                     const file = loadedFiles[i];
                     const progressVal = 10 + Math.round(((i + 1) / loadedFiles.length) * 80);
-                    updateProgress(progressVal, `Traitement de ${file.name}...`, "Analyse de la structure et adaptation ARU...");
+                    updateProgress(progressVal, `Traitement de ${file.name}...`, "Adaptation aux normes ARU...");
 
                     let resultHtml = "";
 
@@ -657,8 +621,8 @@
                 }
 
                 aruEditor.innerHTML = combinedHtml;
-
-                updateProgress(100, "Terminé !", "Document adapté aux normes ARU prêt pour révision.");
+                updateProgress(100, "Terminé !", "Document disponible dans l'éditeur.");
+                
                 setTimeout(() => {
                     loadingOverlay.classList.add('hidden');
                     document.getElementById('editor-section').scrollIntoView({ behavior: 'smooth' });
@@ -669,11 +633,10 @@
                 console.error("Erreur de traitement :", error);
                 loadingOverlay.classList.add('hidden');
                 processBtn.disabled = false;
-                
-                showToast(error.message, "error", "Erreur lors de la conversion");
+                showToast(error.message, "error", "Erreur de conversion");
 
                 if (error.message.includes("API") || error.message.includes("400") || error.message.includes("403")) {
-                    setTimeout(() => openApiKeyModal(), 1200);
+                    setTimeout(() => openApiKeyModal(), 1000);
                 }
             }
         }
@@ -688,14 +651,12 @@
             const parser = new DOMParser();
             const doc = parser.parseFromString(rawHtml, 'text/html');
             
-            // Titres en gras
             doc.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
                 if (!heading.querySelector('strong')) {
                     heading.innerHTML = `<strong>${heading.innerHTML}</strong>`;
                 }
             });
 
-            // Surlignage des verbes d'action
             const actionVerbs = [
                 'Calculez', 'Calcule', 'Surlignez', 'Surligne', 'Trouvez', 'Trouve', 
                 'Entourez', 'Entoure', 'Expliquez', 'Explique', 'Justifiez', 'Justifie', 
@@ -709,7 +670,6 @@
             doc.querySelectorAll('p, li, td').forEach(el => {
                 let text = el.innerHTML;
                 
-                // Remplacement des lignes trop courtes/petites par des espaces aérés
                 if (/[._\u2026]{4,}/.test(text) || /^[\s._\u2026-]+$/.test(text.trim())) {
                     const div = doc.createElement('div');
                     div.className = 'aru-answer-space';
@@ -725,7 +685,6 @@
             return doc.body.innerHTML;
         }
 
-        // 1. Traitement Fichier Word .docx
         async function processDocxFile(file) {
             const arrayBuffer = await file.arrayBuffer();
             const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
@@ -734,13 +693,11 @@
             try {
                 return await adaptHtmlWithGemini(html);
             } catch (err) {
-                console.warn("Échec Gemini pour DOCX, bascule vers le formateur ARU local :", err);
-                showToast("Bascule automatique sur le formateur ARU local pour ce fichier Word.", "warning");
+                console.warn("Mise en page Gemini indisponible, application du filtre local ARU.", err);
                 return applyLocalAruFormatting(html);
             }
         }
 
-        // 2. Traitement Fichier PDF
         async function processPdfFile(file) {
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -749,8 +706,8 @@
             for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                 updateProgress(
                     20 + Math.round((pageNum / pdf.numPages) * 60), 
-                    `Analyse PDF - Page ${pageNum}/${pdf.numPages}...`, 
-                    "Extraction de la page pour OCR"
+                    `PDF - Page ${pageNum}/${pdf.numPages}...`, 
+                    "Extraction OCR"
                 );
 
                 const page = await pdf.getPage(pageNum);
@@ -770,13 +727,12 @@
             return fullPdfHtml;
         }
 
-        // 3. Traitement Image / HEIC / Manuscrit
         async function processImageFile(file) {
             let blob = file;
             let mimeType = file.type;
 
             if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
-                updateProgress(20, "Conversion du format HEIC...", "Adaptation de la photo iPhone...");
+                updateProgress(20, "Conversion HEIC...", "Adaptation photo iPhone...");
                 try {
                     const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.8 });
                     blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
@@ -793,10 +749,7 @@
         function blobToBase64(blob) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.onloadend = () => {
-                    const base64String = reader.result.split(',')[1];
-                    resolve(base64String);
-                };
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
                 reader.onerror = reject;
                 reader.readAsDataURL(blob);
             });
@@ -811,16 +764,14 @@
             const optKeepImages = document.getElementById('optKeepImages').checked;
 
             const promptSystem = `
-            Tu es un expert reconnu en orthopédagogie et en Aménagements Raisonnables Universels (ARU) pour les élèves dyslexiques, dyspraxiques et ayant des troubles des apprentissages.
-            Ta mission est d'effectuer un OCR haute précision de ce document (manuscrit ou imprimé) et d'en retourner le contenu sous forme de code HTML strictement structuré.
-
-            Consignes impératives pour les normes ARU :
-            1. **Consignes et Verbes d'action** : ${optConsignes ? 'Mets IMPÉRATIVEMENT en GRAS (balise <strong>) tous les mots-clés et verbes d\'action des consignes (ex: <strong>Surligne</strong>, <strong>Calcule</strong>, <strong>Trouve</strong>, <strong>Entoure</strong>, <strong>Explique</strong>, <strong>Justifie</strong>, <strong>Coche</strong>, <strong>Lis</strong>, etc.).' : ''}
-            2. **Structure du document** : Organise clairement avec des titres <h1>, <h2>, <h3>. Tous les titres doivent être mis en évidence en <strong>gras</strong>.
-            3. **Espacement des réponses ("lignes trop petites")** : ${optEspaces ? 'Dès qu\'il y a une question ou un exercice où l\'élève doit répondre (mots à trous, lignes de réponse trop petites), crée une zone de réponse aérée en insérant la balise HTML suivante : `<div class="aru-answer-space"></div>` avec suffisamment d\'espace vertical.' : ''}
-            4. **Respect absolu du texte** : Conserve scrupuleusement la langue, le sens des mots. INTERDICTION ABSOLUE de couper les mots inutilement en fin de ligne.
-            5. **Tableaux et Illustrations** : ${optKeepImages ? 'Conserve les tableaux sous forme de balises HTML <table>. Si des illustrations sont présentes, conserve les emplacements.' : ''}
-            6. **Format de sortie** : Fournis UNIQUEMENT du code HTML valide (pas de bloc markdown \`\`\`html, juste le code HTML interne).
+            Tu es un expert en orthopédagogie et Aménagements Raisonnables Universels (ARU) pour les élèves à besoins spécifiques.
+            Réalise un OCR haute précision de ce document et retourne le contenu sous forme de HTML structuré :
+            1. **Consignes et Verbes** : ${optConsignes ? 'Mets IMPÉRATIVEMENT en GRAS (balise <strong>) les mots-clés et verbes d\'action (ex: <strong>Surligne</strong>, <strong>Calcule</strong>, <strong>Trouve</strong>, <strong>Entoure</strong>, <strong>Explique</strong>, <strong>Justifie</strong>, <strong>Coche</strong>, <strong>Lis</strong>).' : ''}
+            2. **Structure** : Organise avec des titres <h1>, <h2>, <h3> mis en évidence en <strong>gras</strong>.
+            3. **Agrandissement réponses** : ${optEspaces ? 'Si les espaces de réponse sont trop étroits, insère la balise : `<div class="aru-answer-space"></div>`.' : ''}
+            4. **Sens et Mots** : Respecte scrupuleusement le texte. INTERDICTION de couper les mots en fin de ligne.
+            5. **Tableaux/Images** : ${optKeepImages ? 'Conserve la structure des tableaux (<table>).' : ''}
+            6. **Format** : Renvoie UNIQUEMENT le code HTML propre sans balises Markdown.
             `;
 
             const payload = {
@@ -828,44 +779,27 @@
                     role: "user",
                     parts: [
                         { text: promptSystem },
-                        {
-                            inlineData: {
-                                mimeType: mimeType || "image/jpeg",
-                                data: base64Image
-                            }
-                        }
+                        { inlineData: { mimeType: mimeType || "image/jpeg", data: base64Image } }
                     ]
                 }]
             };
 
-            let response;
-            try {
-                response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-            } catch (err) {
-                throw new Error("Erreur réseau : Impossible de contacter l'API Google Gemini. Vérifiez votre connexion.");
-            }
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).catch(() => {
+                throw new Error("Erreur réseau : Impossible d'appeler l'API Gemini. Vérifiez votre connexion.");
+            });
 
             if (!response.ok) {
-                let errMessage = "";
-                try {
-                    const errData = await response.json();
-                    errMessage = errData.error?.message || response.statusText;
-                } catch (e) {
-                    errMessage = `Statut HTTP ${response.status}`;
-                }
-                throw new Error(`Erreur API Gemini (${response.status}) : ${errMessage}`);
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(`Erreur API Gemini (${response.status}) : ${errData.error?.message || response.statusText}`);
             }
 
             const result = await response.json();
             let htmlText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            
-            if (!htmlText) {
-                throw new Error("L'IA Gemini n'a pas renvoyé de contenu exploitable.");
-            }
+            if (!htmlText) throw new Error("Aucun texte exploitable renvoyé par l'IA.");
 
             return htmlText.replace(/```html/gi, '').replace(/```/g, '').trim();
         }
@@ -875,21 +809,16 @@
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
 
             const promptSystem = `
-            Transforme ce document HTML selon les règles des Aménagements Raisonnables Universels (ARU) :
-            1. Mets en GRAS (balise <strong>) les mots-clés des consignes (Lis, Entoure, Souligne, Calcule, Justifie...).
-            2. Structure le texte avec des titres <h1>, <h2> mis en gras.
-            3. Si des espaces de réponse sont trop étroits, remplace-les par <div class="aru-answer-space"></div>.
-            4. Ne coupe aucun mot.
+            Transforme ce document HTML aux normes ARU :
+            1. Verbes d'action des consignes en <strong>gras</strong>.
+            2. Titres <h1>, <h2> mis en gras.
+            3. Remplace les espaces de réponse trop étroits par <div class="aru-answer-space"></div>.
+            4. Interdiction de couper les mots.
             5. Renvoie UNIQUEMENT le code HTML nettoyé.
             `;
 
             const payload = {
-                contents: [{
-                    role: "user",
-                    parts: [
-                        { text: promptSystem + "\n\nHTML source:\n" + rawHtml }
-                    ]
-                }]
+                contents: [{ role: "user", parts: [{ text: promptSystem + "\n\nHTML:\n" + rawHtml }] }]
             };
 
             const response = await fetch(apiUrl, {
@@ -898,11 +827,7 @@
                 body: JSON.stringify(payload)
             });
 
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error?.message || `Statut ${response.status}`);
-            }
-            
+            if (!response.ok) throw new Error("Clé API invalide ou quota dépassé.");
             const result = await response.json();
             let htmlText = result.candidates?.[0]?.content?.parts?.[0]?.text || rawHtml;
             return htmlText.replace(/```html/gi, '').replace(/```/g, '').trim();
@@ -922,6 +847,65 @@
             showToast("L'éditeur a été réinitialisé.", "info");
         }
 
+        // EXPORTATION PDF FONCTIONNELLE ET DIRECTE
+        async function exportToPdf() {
+            const content = aruEditor.innerHTML;
+            if (!content || content.includes("Le document transformé apparaîtra ici") || content.trim() === "") {
+                showToast("Aucun contenu à exporter. Veuillez d'abord transformer un document.", "warning");
+                return;
+            }
+
+            if (typeof html2pdf === 'undefined') {
+                showToast("Bibliothèque PDF indisponible. Lancement de l'impression natif...", "warning");
+                window.print();
+                return;
+            }
+
+            showToast("Génération du fichier PDF en cours...", "info");
+
+            // Isolation du conteneur pour le rendu html2pdf
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.left = '0';
+            container.style.top = '0';
+            container.style.width = '750px';
+            container.style.padding = '30px';
+            container.style.backgroundColor = '#ffffff';
+            container.style.color = '#1e293b';
+            container.style.fontFamily = 'Arial, Helvetica, sans-serif';
+            container.style.fontSize = '14pt';
+            container.style.lineHeight = '1.5';
+            container.style.zIndex = '-99999';
+            container.style.opacity = '0.99';
+
+            container.innerHTML = content;
+            container.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+
+            document.body.appendChild(container);
+
+            const opt = {
+                margin:       [15, 15, 15, 15],
+                filename:     'Document_Adapte_ARU.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false, windowWidth: 800 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+
+            try {
+                await html2pdf().set(opt).from(container).save();
+                showToast("Le document PDF a été généré et téléchargé avec succès !", "success");
+            } catch (err) {
+                console.error("Erreur html2pdf :", err);
+                showToast("Basculement vers la boîte de dialogue d'impression/PDF du système...", "info");
+                window.print();
+            } finally {
+                if (container.parentElement) {
+                    document.body.removeChild(container);
+                }
+            }
+        }
+
         function exportDocxAction() {
             const htmlContent = aruEditor.innerHTML;
             if (!htmlContent || htmlContent.includes("Le document transformé apparaîtra ici")) {
@@ -931,7 +915,6 @@
             exportToDocx(htmlContent);
         }
 
-        // Export DOCX via docx.js (avec fallback Word HTML)
         async function exportToDocx(htmlContent) {
             try {
                 const docxLib = window.docx;
@@ -1000,15 +983,9 @@
 
                     const doc = new Document({
                         sections: [{
-                            properties: {
-                                page: {
-                                    margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
-                                }
-                            },
+                            properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
                             children: docChildren.length > 0 ? docChildren : [
-                                new Paragraph({
-                                    children: [new TextRun({ text: "Document Adapté ARU", font: "Arial", size: 28 })]
-                                })
+                                new Paragraph({ children: [new TextRun({ text: "Document Adapté ARU", font: "Arial", size: 28 })] })
                             ]
                         }]
                     });
@@ -1019,7 +996,7 @@
                     return;
                 }
             } catch (err) {
-                console.warn("Échec docx.js, tentative export Word HTML :", err);
+                console.warn("Docx.js indisponible, exportation au format Word HTML...", err);
             }
 
             exportToWordHtml(htmlContent);
@@ -1028,13 +1005,11 @@
         function exportToWordHtml(htmlContent) {
             const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document ARU</title><style>body { font-family: Arial, sans-serif; font-size: 14pt; line-height: 1.5; color: #1e293b; } .aru-answer-space { border: 2px dashed #94a3b8; height: 100px; margin: 15px 0; } h1 { font-size: 20pt; font-weight: bold; color: #0c4a6e; } h2 { font-size: 17pt; font-weight: bold; color: #0369a1; } h3 { font-size: 15pt; font-weight: bold; color: #0284c7; } strong { font-weight: bold; background-color: #fef08a; }</style></head><body>";
             const footer = "</body></html>";
-            const sourceHTML = header + htmlContent + footer;
-            const blob = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
+            const blob = new Blob(['\ufeff', header + htmlContent + footer], { type: 'application/msword' });
             saveAs(blob, "Document_Adapte_ARU.docx");
             showToast("Fichier Word généré en mode secours HTML.", "info");
         }
 
-        // Fonction d'impression native permettant d'imprimer directement
         function printNativePdf() {
             const htmlContent = aruEditor.innerHTML;
             if (!htmlContent || htmlContent.includes("Le document transformé apparaîtra ici") || htmlContent.trim() === "") {
@@ -1069,30 +1044,28 @@
             const feedback = document.getElementById('testKeyFeedback');
             const key = document.getElementById('apiKeyInput').value.trim();
 
-            feedback.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'bg-emerald-50', 'text-emerald-700');
             feedback.className = 'mt-2 text-xs p-2.5 rounded-lg bg-slate-100 text-slate-700 flex items-center gap-2';
-            feedback.innerHTML = '<i class="fa-solid fa-spinner animate-spin text-aru-600"></i> Test de la clé en cours auprès de Google Gemini...';
+            feedback.innerHTML = '<i class="fa-solid fa-spinner animate-spin text-aru-600"></i> Test de la clé...';
 
             try {
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${key}`;
                 const res = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "Reponds seulement avec le mot OK" }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "OK" }] }] })
                 });
 
                 if (res.ok) {
                     feedback.className = 'mt-2 text-xs p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-medium flex items-center gap-2';
-                    feedback.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i> Clé valide ! Connexion réussie avec Gemini 3.1 Flash.';
+                    feedback.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i> Clé API valide ! Connexion Gemini réussie.';
                 } else {
                     const errJson = await res.json().catch(() => ({}));
-                    const msg = errJson.error?.message || `Code d'erreur ${res.status}`;
                     feedback.className = 'mt-2 text-xs p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-800 flex items-start gap-2';
-                    feedback.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600 text-sm mt-0.5"></i> <div><strong>Clé invalide :</strong> ${msg}</div>`;
+                    feedback.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600 text-sm mt-0.5"></i> <div><strong>Clé invalide :</strong> ${errJson.error?.message || res.statusText}</div>`;
                 }
             } catch (err) {
                 feedback.className = 'mt-2 text-xs p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-800 flex items-center gap-2';
-                feedback.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600 text-sm"></i> Impossible de contacter le serveur : ${err.message}`;
+                feedback.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600 text-sm"></i> Erreur : ${err.message}`;
             }
         }
 
@@ -1102,7 +1075,7 @@
             localStorage.setItem('GEMINI_API_KEY', key);
             updateApiKeyStatusDot();
             closeApiKeyModal();
-            showToast("Clé API Gemini enregistrée !", "success");
+            showToast("Clé API Gemini enregistrée avec succès !", "success");
         }
 
         function clearApiKey() {
