@@ -223,9 +223,9 @@
             </div>
 
             <div class="flex items-center gap-3">
-                <button id="apiKeyBtn" onclick="openApiKeyModal()" class="text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition">
-                    <i class="fa-solid fa-key"></i> Clé API Gemini
-                    <span id="apiKeyStatusDot" class="w-2 h-2 rounded-full bg-slate-400 inline-block" title="Statut de la clé API"></span>
+                <button id="apiKeyBtn" onclick="openApiKeyModal()" class="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-key text-amber-500"></i> Clé API (Optionnel)
+                    <span id="apiKeyStatusDot" class="w-2 h-2 rounded-full bg-emerald-500 inline-block" title="Prêt à l'emploi"></span>
                 </button>
                 <a href="#editor-section" class="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition">
                     <i class="fa-solid fa-pen-to-square"></i> Accéder à l'éditeur
@@ -239,44 +239,63 @@
         <!-- Bannière explicative ARU -->
         <div class="bg-gradient-to-r from-aru-900 to-aru-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden no-print">
             <div class="relative z-10 max-w-3xl">
-                <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider inline-block mb-2">Normes d'Accessibilité ARU</span>
+                <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider inline-block mb-2">Normes d'Accessibilité ARU • Accessible à tous</span>
                 <h2 class="text-2xl font-bold mb-2">Transformez vos documents en version accessible</h2>
                 <p class="text-slate-100 text-sm leading-relaxed mb-4">
-                    Importez un fichier Word, PDF, une image, un document manuscrit ou une photo iPhone (HEIC). L'IA extrait le texte, applique la typographie <strong>Arial 14pt (Interligne 1.5)</strong>, surligne les consignes en gras et <strong>agrandit les espaces de réponses</strong>.
+                    Importez un fichier Word, PDF, une image, un document manuscrit, une photo iPhone (HEIC) ou <strong>collez directement du texte</strong>. L'application applique la typographie <strong>Arial 14pt (Interligne 1.5)</strong>, surligne les consignes en gras et <strong>agrandit les espaces de réponses</strong>.
                 </p>
                 <div class="flex flex-wrap gap-4 text-xs font-medium text-slate-200">
                     <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Mots-clés des consignes en gras</span>
                     <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Maintien des tableaux & schémas</span>
                     <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Support Manuscrits & HEIC</span>
-                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Sans coupure de mots</span>
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Sans clé API obligatoire</span>
                 </div>
             </div>
         </div>
 
-        <!-- Zone de dépôt et sélection de fichier -->
+        <!-- Zone de dépôt, sélection de fichier et texte direct -->
         <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 no-print">
             <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <i class="fa-solid fa-file-import text-aru-600"></i> Étape 1 : Importez votre document
+                <i class="fa-solid fa-file-import text-aru-600"></i> Étape 1 : Choisissez votre méthode de conversion
             </h3>
 
-            <div id="dropzone" class="border-2 border-dashed border-slate-300 hover:border-aru-500 bg-slate-50 hover:bg-aru-50/50 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 relative">
-                <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.png,.jpg,.jpeg,.heic,.heif" multiple>
-                
-                <div class="space-y-4">
-                    <div class="w-16 h-16 bg-white shadow-sm rounded-full flex items-center justify-center mx-auto text-aru-600 border border-slate-100">
-                        <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+            <!-- Onglets de méthode d'import -->
+            <div class="flex border-b border-slate-200 mb-4">
+                <button id="tabFileBtn" onclick="switchImportTab('file')" class="px-4 py-2 border-b-2 border-aru-600 font-bold text-aru-600 text-xs sm:text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Importer un fichier
+                </button>
+                <button id="tabTextBtn" onclick="switchImportTab('text')" class="px-4 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-700 font-medium text-xs sm:text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-paste"></i> Saisir / Coller du texte
+                </button>
+            </div>
+
+            <!-- Contenu Onglet 1 : Zone de dépôt de fichiers -->
+            <div id="fileImportZone">
+                <div id="dropzone" class="border-2 border-dashed border-slate-300 hover:border-aru-500 bg-slate-50 hover:bg-aru-50/50 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 relative">
+                    <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.png,.jpg,.jpeg,.heic,.heif" multiple>
+                    
+                    <div class="space-y-4">
+                        <div class="w-16 h-16 bg-white shadow-sm rounded-full flex items-center justify-center mx-auto text-aru-600 border border-slate-100">
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-base font-semibold text-slate-700">Déposez vos documents ici ou <span class="text-aru-600 underline">parcourez vos fichiers</span></p>
+                            <p class="text-xs text-slate-500 mt-1">PDF, Word (.docx), Images (PNG, JPG, HEIC), Notes manuscrites</p>
+                        </div>
                     </div>
-                    <div>
-                        <p class="text-base font-semibold text-slate-700">Déposez votre document ici ou <span class="text-aru-600 underline">parcourez vos fichiers</span></p>
-                        <p class="text-xs text-slate-500 mt-1">PDF, Word (.docx), Images (PNG, JPG, HEIC, Captures), Notes manuscrites</p>
-                    </div>
+                </div>
+
+                <!-- Liste des fichiers sélectionnés -->
+                <div id="fileListContainer" class="hidden mt-4 space-y-2">
+                    <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fichiers à traiter :</h4>
+                    <div id="fileList" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
                 </div>
             </div>
 
-            <!-- Liste des fichiers sélectionnés -->
-            <div id="fileListContainer" class="hidden mt-4 space-y-2">
-                <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fichiers à traiter :</h4>
-                <div id="fileList" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+            <!-- Contenu Onglet 2 : Zone de texte brut -->
+            <div id="textImportZone" class="hidden space-y-3">
+                <label for="directTextInput" class="block text-xs font-semibold text-slate-700">Collez ou saisissez votre texte ci-dessous :</label>
+                <textarea id="directTextInput" rows="8" placeholder="Collez votre texte ici (ex: consignes d'exercices, textes de lecture, questions...)..." class="w-full p-4 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-aru-500 focus:outline-none font-sans"></textarea>
             </div>
 
             <!-- Options de mise en page -->
@@ -297,8 +316,8 @@
 
             <!-- Bouton de lancement -->
             <div class="mt-6 text-center">
-                <button id="processBtn" onclick="processDocuments()" disabled class="w-full sm:w-auto px-8 py-3.5 bg-aru-600 hover:bg-aru-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 mx-auto">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i> Transformer le document au format ARU
+                <button id="processBtn" onclick="processInputData()" class="w-full sm:w-auto px-8 py-3.5 bg-aru-600 hover:bg-aru-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 mx-auto">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Transformer au format ARU
                 </button>
             </div>
         </section>
@@ -381,13 +400,13 @@
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-slate-100 pb-3">
                 <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-key text-amber-500"></i> Clé API Google Gemini
+                    <i class="fa-solid fa-key text-amber-500"></i> Clé API Google Gemini (Optionnel)
                 </h3>
                 <button onclick="closeApiKeyModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             
             <p class="text-xs text-slate-600 leading-relaxed">
-                L'application utilise l'API Gemini 3.1 Flash pour réaliser l'OCR des manuscrits, PDF, scans et appliquer la mise en page ARU.
+                L'application fonctionne <strong>directement pour tous les utilisateurs</strong> sans qu'aucune clé ne soit obligatoire. Si vous disposez de votre propre clé personnelle Google AI Studio, vous pouvez la renseigner ici.
             </p>
 
             <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800 space-y-1.5">
@@ -441,318 +460,69 @@
         // Variables globales
         let loadedFiles = [];
         let customApiKey = localStorage.getItem('GEMINI_API_KEY') || "";
+        let currentTab = 'file';
 
-        // Références DOM
-        const dropzone = document.getElementById('dropzone');
-        const fileInput = document.getElementById('fileInput');
-        const fileList = document.getElementById('fileList');
-        const fileListContainer = document.getElementById('fileListContainer');
-        const processBtn = document.getElementById('processBtn');
-        const aruEditor = document.getElementById('aruEditor');
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        const loadingStatus = document.getElementById('loadingStatus');
-        const loadingDetail = document.getElementById('loadingDetail');
-        const progressBar = document.getElementById('progressBar');
+        function switchImportTab(tab) {
+            currentTab = tab;
+            const tabFileBtn = document.getElementById('tabFileBtn');
+            const tabTextBtn = document.getElementById('tabTextBtn');
+            const fileZone = document.getElementById('fileImportZone');
+            const textZone = document.getElementById('textImportZone');
 
-        function showToast(message, type = 'info', title = '') {
-            const container = document.getElementById('toastContainer');
-            if (!container) return;
-
-            const toast = document.createElement('div');
-            toast.className = `pointer-events-auto flex items-start gap-3 p-3.5 rounded-xl shadow-lg border text-xs transition-all duration-300 transform translate-y-2 opacity-0 bg-white`;
-
-            let icon = 'fa-circle-info text-blue-500';
-            let borderColor = 'border-slate-200';
-
-            if (type === 'success') {
-                icon = 'fa-circle-check text-emerald-500';
-                borderColor = 'border-emerald-200';
-            } else if (type === 'error') {
-                icon = 'fa-triangle-exclamation text-red-500';
-                borderColor = 'border-red-200';
-            } else if (type === 'warning') {
-                icon = 'fa-circle-exclamation text-amber-500';
-                borderColor = 'border-amber-200';
+            if (tab === 'file') {
+                tabFileBtn.className = 'px-4 py-2 border-b-2 border-aru-600 font-bold text-aru-600 text-xs sm:text-sm flex items-center gap-2';
+                tabTextBtn.className = 'px-4 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-700 font-medium text-xs sm:text-sm flex items-center gap-2';
+                fileZone.classList.remove('hidden');
+                textZone.classList.add('hidden');
+            } else {
+                tabTextBtn.className = 'px-4 py-2 border-b-2 border-aru-600 font-bold text-aru-600 text-xs sm:text-sm flex items-center gap-2';
+                tabFileBtn.className = 'px-4 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-700 font-medium text-xs sm:text-sm flex items-center gap-2';
+                textZone.classList.remove('hidden');
+                fileZone.classList.add('hidden');
             }
-
-            toast.classList.add(borderColor);
-
-            toast.innerHTML = `
-                <i class="fa-solid ${icon} text-base mt-0.5"></i>
-                <div class="flex-1">
-                    ${title ? `<h5 class="font-bold text-slate-800 mb-0.5">${title}</h5>` : ''}
-                    <p class="text-slate-600 leading-snug">${message}</p>
-                </div>
-                <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-slate-600 p-0.5">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            `;
-
-            container.appendChild(toast);
-
-            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
-            setTimeout(() => {
-                if (toast.parentElement) {
-                    toast.classList.add('opacity-0', 'translate-y-2');
-                    setTimeout(() => toast.remove(), 300);
-                }
-            }, 5000);
         }
 
         function updateApiKeyStatusDot() {
             const dot = document.getElementById('apiKeyStatusDot');
             if (!dot) return;
-            if (customApiKey && customApiKey.trim().length > 10) {
-                dot.className = 'w-2 h-2 rounded-full bg-emerald-500 inline-block';
-                dot.title = "Clé API Gemini configurée";
-            } else {
-                dot.className = 'w-2 h-2 rounded-full bg-amber-400 inline-block';
-                dot.title = "Clé non configurée";
-            }
+            dot.className = 'w-2 h-2 rounded-full bg-emerald-500 inline-block';
+            dot.title = customApiKey ? "Clé personnalisée active" : "Prêt à l'emploi (mode automatique)";
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
-            if (customApiKey) {
-                document.getElementById('apiKeyInput').value = customApiKey;
-            }
-            updateApiKeyStatusDot();
-
-            // Événements Dropzone
-            dropzone.addEventListener('click', () => fileInput.click());
-            
-            dropzone.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                dropzone.classList.add('border-aru-500', 'bg-aru-50');
-            });
-
-            dropzone.addEventListener('dragleave', () => {
-                dropzone.classList.remove('border-aru-500', 'bg-aru-50');
-            });
-
-            dropzone.addEventListener('drop', (e) => {
-                e.preventDefault();
-                dropzone.classList.remove('border-aru-500', 'bg-aru-50');
-                if (e.dataTransfer.files.length > 0) {
-                    handleFiles(e.dataTransfer.files);
+        async function processInputData() {
+            if (currentTab === 'text') {
+                const text = document.getElementById('directTextInput').value.trim();
+                if (!text) {
+                    showToast("Veuillez saisir ou coller un texte à adapter.", "warning");
+                    return;
                 }
-            });
-
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleFiles(e.target.files);
-                }
-            });
-        });
-
-        function handleFiles(files) {
-            for (let file of files) {
-                if (!loadedFiles.some(f => f.name === file.name && f.size === file.size)) {
-                    loadedFiles.push(file);
-                }
-            }
-            renderFileList();
-        }
-
-        function renderFileList() {
-            fileList.innerHTML = '';
-            if (loadedFiles.length === 0) {
-                fileListContainer.classList.add('hidden');
-                processBtn.disabled = true;
-                return;
-            }
-
-            fileListContainer.classList.remove('hidden');
-            processBtn.disabled = false;
-
-            loadedFiles.forEach((file, index) => {
-                const item = document.createElement('div');
-                item.className = 'flex items-center justify-between bg-white p-2.5 rounded-lg border border-slate-200 text-xs';
                 
-                let iconClass = 'fa-file-lines text-slate-500';
-                if (file.name.endsWith('.pdf')) iconClass = 'fa-file-pdf text-red-500';
-                else if (file.name.endsWith('.docx')) iconClass = 'fa-file-word text-blue-500';
-                else if (file.type.startsWith('image/')) iconClass = 'fa-file-image text-emerald-500';
+                loadingOverlay.classList.remove('hidden');
+                updateProgress(50, "Adaptation du texte...", "Mise en page ARU...");
 
-                item.innerHTML = `
-                    <div class="flex items-center gap-2 overflow-hidden">
-                        <i class="fa-solid ${iconClass} text-base"></i>
-                        <span class="font-medium text-slate-700 truncate max-w-xs">${file.name}</span>
-                        <span class="text-[10px] text-slate-400">(${Math.round(file.size / 1024)} KB)</span>
-                    </div>
-                    <button onclick="removeFile(${index})" class="text-slate-400 hover:text-red-500 p-1">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                `;
-                fileList.appendChild(item);
-            });
-        }
-
-        function removeFile(index) {
-            loadedFiles.splice(index, 1);
-            renderFileList();
-        }
-
-        async function processDocuments() {
-            if (loadedFiles.length === 0) return;
-
-            loadingOverlay.classList.remove('hidden');
-            processBtn.disabled = true;
-            updateProgress(10, "Préparation...", "Analyse et conversion des documents...");
-
-            let combinedHtml = "";
-
-            try {
-                for (let i = 0; i < loadedFiles.length; i++) {
-                    const file = loadedFiles[i];
-                    const progressVal = 10 + Math.round(((i + 1) / loadedFiles.length) * 80);
-                    updateProgress(progressVal, `Traitement de ${file.name}...`, "Adaptation aux normes ARU...");
-
-                    let resultHtml = "";
-
-                    if (file.name.toLowerCase().endsWith('.docx')) {
-                        resultHtml = await processDocxFile(file);
-                    } else if (file.name.toLowerCase().endsWith('.pdf')) {
-                        resultHtml = await processPdfFile(file);
-                    } else {
-                        resultHtml = await processImageFile(file);
-                    }
-
-                    combinedHtml += resultHtml + "<br><hr class='my-6 border-slate-200'><br>";
+                let formattedHtml = text.split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+                
+                try {
+                    formattedHtml = await adaptHtmlWithGemini(formattedHtml);
+                } catch (e) {
+                    formattedHtml = applyLocalAruFormatting(formattedHtml);
                 }
 
-                aruEditor.innerHTML = combinedHtml;
-                updateProgress(100, "Terminé !", "Document disponible dans l'éditeur.");
-                
+                aruEditor.innerHTML = formattedHtml;
+                updateProgress(100, "Terminé !", "Texte prêt.");
                 setTimeout(() => {
                     loadingOverlay.classList.add('hidden');
                     document.getElementById('editor-section').scrollIntoView({ behavior: 'smooth' });
-                    showToast("Document adapté généré avec succès dans l'éditeur !", "success");
-                }, 800);
+                    showToast("Texte adapté généré avec succès !", "success");
+                }, 400);
 
-            } catch (error) {
-                console.error("Erreur de traitement :", error);
-                loadingOverlay.classList.add('hidden');
-                processBtn.disabled = false;
-                showToast(error.message, "error", "Erreur de conversion");
-
-                if (error.message.includes("API") || error.message.includes("400") || error.message.includes("403")) {
-                    setTimeout(() => openApiKeyModal(), 1000);
-                }
-            }
-        }
-
-        function updateProgress(percent, status, detail) {
-            progressBar.style.width = percent + "%";
-            loadingStatus.textContent = status;
-            loadingDetail.textContent = detail;
-        }
-
-        function applyLocalAruFormatting(rawHtml) {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(rawHtml, 'text/html');
-            
-            doc.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
-                if (!heading.querySelector('strong')) {
-                    heading.innerHTML = `<strong>${heading.innerHTML}</strong>`;
-                }
-            });
-
-            const actionVerbs = [
-                'Calculez', 'Calcule', 'Surlignez', 'Surligne', 'Trouvez', 'Trouve', 
-                'Entourez', 'Entoure', 'Expliquez', 'Explique', 'Justifiez', 'Justifie', 
-                'Cochez', 'Coche', 'Lisez', 'Lis', 'Complétez', 'Complète', 'Remplissez', 
-                'Remplis', 'Associez', 'Associe', 'Reliez', 'Relie', 'Écrivez', 'Écris',
-                'Répondez', 'Réponds', 'Analysez', 'Analyse'
-            ];
-            
-            const verbRegex = new RegExp(`\\b(${actionVerbs.join('|')})\\b`, 'gi');
-
-            doc.querySelectorAll('p, li, td').forEach(el => {
-                let text = el.innerHTML;
-                
-                if (/[._\u2026]{4,}/.test(text) || /^[\s._\u2026-]+$/.test(text.trim())) {
-                    const div = doc.createElement('div');
-                    div.className = 'aru-answer-space';
-                    el.replaceWith(div);
+            } else {
+                if (loadedFiles.length === 0) {
+                    showToast("Veuillez sélectionner au moins un fichier à transformer.", "warning");
                     return;
                 }
-
-                if (document.getElementById('optConsignes')?.checked) {
-                    el.innerHTML = el.innerHTML.replace(verbRegex, '<strong>$1</strong>');
-                }
-            });
-
-            return doc.body.innerHTML;
-        }
-
-        async function processDocxFile(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
-            let html = result.value;
-
-            try {
-                return await adaptHtmlWithGemini(html);
-            } catch (err) {
-                console.warn("Mise en page Gemini indisponible, application du filtre local ARU.", err);
-                return applyLocalAruFormatting(html);
+                processDocuments();
             }
-        }
-
-        async function processPdfFile(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            let fullPdfHtml = "";
-
-            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                updateProgress(
-                    20 + Math.round((pageNum / pdf.numPages) * 60), 
-                    `PDF - Page ${pageNum}/${pdf.numPages}...`, 
-                    "Extraction OCR"
-                );
-
-                const page = await pdf.getPage(pageNum);
-                const viewport = page.getViewport({ scale: 1.5 });
-                const canvas = document.createElement('canvas');
-                const context = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
-
-                await page.render({ canvasContext: context, viewport: viewport }).promise;
-                const base64Image = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
-
-                const pageHtml = await callGeminiVision(base64Image, 'image/jpeg');
-                fullPdfHtml += pageHtml;
-            }
-
-            return fullPdfHtml;
-        }
-
-        async function processImageFile(file) {
-            let blob = file;
-            let mimeType = file.type;
-
-            if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
-                updateProgress(20, "Conversion HEIC...", "Adaptation photo iPhone...");
-                try {
-                    const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.8 });
-                    blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
-                    mimeType = "image/jpeg";
-                } catch (e) {
-                    console.warn("Échec heic2any, tentative directe...", e);
-                }
-            }
-
-            const base64Data = await blobToBase64(blob);
-            return await callGeminiVision(base64Data, mimeType || 'image/jpeg');
-        }
-
-        function blobToBase64(blob) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-            });
         }
 
         async function callGeminiVision(base64Image, mimeType) {
@@ -788,13 +558,11 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
-            }).catch(() => {
-                throw new Error("Erreur réseau : Impossible d'appeler l'API Gemini. Vérifiez votre connexion.");
             });
 
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
-                throw new Error(`Erreur API Gemini (${response.status}) : ${errData.error?.message || response.statusText}`);
+                throw new Error(`Analyse d'image indisponible (${response.status}) : ${errData.error?.message || "Erreur de traitement"}`);
             }
 
             const result = await response.json();
@@ -827,7 +595,7 @@
                 body: JSON.stringify(payload)
             });
 
-            if (!response.ok) throw new Error("Clé API invalide ou quota dépassé.");
+            if (!response.ok) throw new Error("Analyse IA indisponible, basculement en mode local.");
             const result = await response.json();
             let htmlText = result.candidates?.[0]?.content?.parts?.[0]?.text || rawHtml;
             return htmlText.replace(/```html/gi, '').replace(/```/g, '').trim();
