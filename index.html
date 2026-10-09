@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adapt'Text ARU - Convertisseur Accessible & Export PDF/Word</title>
     
-    <!-- Tailwind CSS pour un design responsive et moderne -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -27,26 +27,27 @@
         }
     </script>
     
-    <!-- FontAwesome pour les icônes -->
+    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Libraries JS externes -->
     <!-- docx.js (bundle UMD) -->
     <script src="https://cdn.jsdelivr.net/npm/docx@8.2.2/build/index.umd.js"></script>
-    <!-- mammoth.js pour lire les fichiers Word -->
+    <!-- mammoth.js pour la conversion Word en local -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-    <!-- pdf.js pour l'OCR des PDF -->
+    <!-- pdf.js pour l'extraction PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <!-- heic2any pour convertir le format iPhone HEIC -->
+    <!-- heic2any pour les images HEIC -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
-    <!-- FileSaver pour les téléchargements -->
+    <!-- FileSaver pour enregistrer les fichiers -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <!-- html2pdf.js pour la génération directe de PDF -->
+    <!-- html2pdf.js pour l'export PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Tesseract.js pour l'OCR d'images 100% local sans clé API -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: Arial, Helvetica, sans-serif;
         }
 
         /* Normes de typographie et mise en page ARU */
@@ -57,10 +58,11 @@
             color: #1e293b;
             word-break: keep-all;
             overflow-wrap: break-word;
+            text-align: left !important;
         }
 
         .aru-content p {
-            margin-bottom: 1rem;
+            margin-bottom: 1.2rem;
             line-height: 1.5 !important;
             font-size: 14pt !important;
         }
@@ -91,36 +93,40 @@
             color: #0284c7;
         }
 
-        .aru-content strong {
+        /* Mots-clés des consignes en gras mis en évidence */
+        .aru-content strong, .aru-content b {
             font-weight: 800 !important;
             color: #000000;
             background-color: #fef08a;
-            padding: 0 2px;
-            border-radius: 2px;
+            padding: 0 4px;
+            border-radius: 3px;
         }
 
-        /* Zones de réponse aérées */
+        /* Zones de réponse aérées ARU */
         .aru-answer-space {
             background-color: #f8fafc;
-            border: 2px dashed #94a3b8;
+            border: 2px dashed #0284c7;
             border-radius: 8px;
             padding: 1.25rem;
-            margin: 1rem 0;
+            margin: 1.2rem 0;
             min-height: 110px;
             position: relative;
+            display: block;
+            clear: both;
         }
 
         .aru-answer-space::before {
-            content: "✍️ Zone de réponse aérée";
+            content: "✍️ Zone de réponse aérée (ARU)";
             font-size: 10pt;
-            color: #64748b;
+            color: #0369a1;
             position: absolute;
-            top: 4px;
-            right: 8px;
+            top: 6px;
+            right: 10px;
             font-style: italic;
+            font-weight: 600;
         }
 
-        /* Tableaux et images adaptés */
+        /* Tableaux et images conservés */
         .aru-content table {
             width: 100%;
             border-collapse: collapse;
@@ -166,7 +172,13 @@
             color: #0f172a;
         }
 
-        /* Impression propre */
+        /* Zone de drop dynamique */
+        .dropzone-active {
+            border-color: #0284c7 !important;
+            background-color: #e0f2fe !important;
+        }
+
+        /* Styles d'impression */
         @media print {
             .no-print {
                 display: none !important;
@@ -197,7 +209,7 @@
             }
 
             .aru-answer-space {
-                border: 2px dashed #64748b !important;
+                border: 2px dashed #0369a1 !important;
                 background-color: #ffffff !important;
                 page-break-inside: avoid;
             }
@@ -236,7 +248,6 @@
 
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
-        <!-- Bannière explicative ARU -->
         <div class="bg-gradient-to-r from-aru-900 to-aru-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden no-print">
             <div class="relative z-10 max-w-3xl">
                 <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider inline-block mb-2">Normes d'Accessibilité ARU • Accessible à tous</span>
@@ -247,96 +258,96 @@
                 <div class="flex flex-wrap gap-4 text-xs font-medium text-slate-200">
                     <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Mots-clés des consignes en gras</span>
                     <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Maintien des tableaux & schémas</span>
-                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Support Manuscrits & HEIC</span>
-                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Sans clé API obligatoire</span>
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> OCR Local & Manuscrits/HEIC</span>
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> 100% Fonctionnel sans clé requise</span>
                 </div>
             </div>
         </div>
 
-        <!-- Zone de dépôt, sélection de fichier et texte direct -->
         <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 no-print">
             <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <i class="fa-solid fa-file-import text-aru-600"></i> Étape 1 : Choisissez votre méthode de conversion
+                <i class="fa-solid fa-file-import text-aru-600"></i> Étape 1 : Choisissez votre méthode d'adaptation
             </h3>
 
-            <!-- Onglets de méthode d'import -->
+            <!-- Onglets d'importation -->
             <div class="flex border-b border-slate-200 mb-4">
                 <button id="tabFileBtn" onclick="switchImportTab('file')" class="px-4 py-2 border-b-2 border-aru-600 font-bold text-aru-600 text-xs sm:text-sm flex items-center gap-2">
-                    <i class="fa-solid fa-cloud-arrow-up"></i> Importer un fichier
+                    <i class="fa-solid fa-cloud-arrow-up"></i> Importer un fichier (Word, PDF, Image)
                 </button>
                 <button id="tabTextBtn" onclick="switchImportTab('text')" class="px-4 py-2 border-b-2 border-transparent text-slate-500 hover:text-slate-700 font-medium text-xs sm:text-sm flex items-center gap-2">
-                    <i class="fa-solid fa-paste"></i> Saisir / Coller du texte
+                    <i class="fa-solid fa-paste"></i> Saisir / Coller du texte directement
                 </button>
             </div>
 
-            <!-- Contenu Onglet 1 : Zone de dépôt de fichiers -->
+            <!-- Onglet 1 : Zone de dépôt de fichiers révisée -->
             <div id="fileImportZone">
-                <div id="dropzone" class="border-2 border-dashed border-slate-300 hover:border-aru-500 bg-slate-50 hover:bg-aru-50/50 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 relative">
-                    <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.png,.jpg,.jpeg,.heic,.heif" multiple>
+                <div id="dropzone" class="border-2 border-dashed border-slate-300 bg-slate-50 hover:border-aru-500 hover:bg-aru-50/50 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 relative">
+                    <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.heic,.heif,.txt" multiple>
                     
-                    <div class="space-y-4">
+                    <div class="space-y-4 pointer-events-none">
                         <div class="w-16 h-16 bg-white shadow-sm rounded-full flex items-center justify-center mx-auto text-aru-600 border border-slate-100">
                             <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
                         </div>
                         <div>
-                            <p class="text-base font-semibold text-slate-700">Déposez vos documents ici ou <span class="text-aru-600 underline">parcourez vos fichiers</span></p>
-                            <p class="text-xs text-slate-500 mt-1">PDF, Word (.docx), Images (PNG, JPG, HEIC), Notes manuscrites</p>
+                            <p class="text-base font-semibold text-slate-700">Déposez vos documents ici ou <span class="text-aru-600 underline">cliquez pour parcourir</span></p>
+                            <p class="text-xs text-slate-500 mt-1">Word (.docx), PDF, Images (PNG, JPG, HEIC, Captures), Notes manuscrites, Textes</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Liste des fichiers sélectionnés -->
                 <div id="fileListContainer" class="hidden mt-4 space-y-2">
-                    <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fichiers à traiter :</h4>
-                    <div id="fileList" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fichiers prêts à être transformés :</h4>
+                        <button onclick="clearFileList()" class="text-xs text-red-500 hover:underline">Vider la liste</button>
+                    </div>
+                    <div id="fileList" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
                 </div>
             </div>
 
-            <!-- Contenu Onglet 2 : Zone de texte brut -->
+            <!-- Onglet 2 : Saisie directe -->
             <div id="textImportZone" class="hidden space-y-3">
                 <label for="directTextInput" class="block text-xs font-semibold text-slate-700">Collez ou saisissez votre texte ci-dessous :</label>
-                <textarea id="directTextInput" rows="8" placeholder="Collez votre texte ici (ex: consignes d'exercices, textes de lecture, questions...)..." class="w-full p-4 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-aru-500 focus:outline-none font-sans"></textarea>
+                <textarea id="directTextInput" rows="8" placeholder="Saisissez ou collez votre texte ici (ex: consignes d'exercices, énoncés, questions, textes de lecture...)..." class="w-full p-4 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-aru-500 focus:outline-none font-sans"></textarea>
             </div>
 
             <!-- Options de mise en page -->
             <div class="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                 <label class="flex items-center space-x-2 cursor-pointer">
                     <input type="checkbox" id="optConsignes" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-4 h-4">
-                    <span class="text-slate-700 font-medium">Mettre en gras les verbes des consignes</span>
+                    <span class="text-slate-700 font-medium">Consignes & verbes d'action en <strong>gras</strong></span>
                 </label>
                 <label class="flex items-center space-x-2 cursor-pointer">
                     <input type="checkbox" id="optEspaces" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-4 h-4">
-                    <span class="text-slate-700 font-medium">Agrandir les zones de réponse étroites</span>
+                    <span class="text-slate-700 font-medium">Agrandir les zones de réponse (pointillés/lignes)</span>
                 </label>
                 <label class="flex items-center space-x-2 cursor-pointer">
                     <input type="checkbox" id="optKeepImages" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-4 h-4">
-                    <span class="text-slate-700 font-medium">Conserver illustrations & tableaux</span>
+                    <span class="text-slate-700 font-medium">Conserver la structure des tableaux & visuels</span>
                 </label>
             </div>
 
             <!-- Bouton de lancement -->
             <div class="mt-6 text-center">
-                <button id="processBtn" onclick="processInputData()" class="w-full sm:w-auto px-8 py-3.5 bg-aru-600 hover:bg-aru-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 mx-auto">
+                <button id="processBtn" onclick="processInputData()" class="w-full sm:w-auto px-8 py-3.5 bg-aru-600 hover:bg-aru-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 mx-auto text-base">
                     <i class="fa-solid fa-wand-magic-sparkles"></i> Transformer au format ARU
                 </button>
             </div>
         </section>
 
-        <!-- Dynamic Loading Overlay -->
         <div id="loadingOverlay" class="hidden bg-white border border-aru-200 rounded-2xl p-8 text-center shadow-lg space-y-4 no-print">
             <div class="inline-block animate-spin text-aru-600 text-4xl">
                 <i class="fa-solid fa-circle-notch"></i>
             </div>
             <div>
-                <h4 id="loadingStatus" class="text-lg font-bold text-slate-800">Analyse par l'Intelligence Artificielle...</h4>
-                <p id="loadingDetail" class="text-xs text-slate-500 mt-1">Extraction du texte, analyse des consignes et mise en page ARU en cours...</p>
+                <h4 id="loadingStatus" class="text-lg font-bold text-slate-800">Transformation au format ARU en cours...</h4>
+                <p id="loadingDetail" class="text-xs text-slate-500 mt-1">Application de la typographie Arial 14pt, surlignage des consignes et aération des espaces...</p>
             </div>
-            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden max-w-md mx-auto">
+            <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden max-w-md mx-auto">
                 <div id="progressBar" class="bg-aru-600 h-full w-0 transition-all duration-300"></div>
             </div>
         </div>
 
-        <!-- Zone Éditeur & Aperçu -->
         <section id="editor-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
             <div class="bg-slate-100 p-4 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4 no-print">
                 <div class="flex items-center gap-2">
@@ -345,7 +356,7 @@
                 </div>
 
                 <!-- Barre d'outils de formatage -->
-                <div class="flex flex-wrap items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
+                <div class="flex flex-wrap items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200 shadow-xs">
                     <button onclick="formatText('bold')" class="editor-btn text-xs" title="Gras"><i class="fa-solid fa-bold"></i></button>
                     <button onclick="formatText('italic')" class="editor-btn text-xs" title="Italique"><i class="fa-solid fa-italic"></i></button>
                     <button onclick="formatText('underline')" class="editor-btn text-xs" title="Souligné"><i class="fa-solid fa-underline"></i></button>
@@ -353,13 +364,13 @@
                     <button onclick="formatText('insertUnorderedList')" class="editor-btn text-xs" title="Puces"><i class="fa-solid fa-list-ul"></i></button>
                     <button onclick="formatText('insertOrderedList')" class="editor-btn text-xs" title="Numérotation"><i class="fa-solid fa-list-ol"></i></button>
                     <div class="w-px h-4 bg-slate-200 mx-1"></div>
-                    <button onclick="insertAnswerBox()" class="editor-btn text-xs text-aru-700 bg-aru-50" title="Ajouter une zone de réponse"><i class="fa-solid fa-square-plus"></i> Insérer espace de réponse</button>
+                    <button onclick="insertAnswerBox()" class="editor-btn text-xs text-aru-700 bg-aru-50 hover:bg-aru-100" title="Ajouter un espace de réponse"><i class="fa-solid fa-square-plus"></i> Insérer espace de réponse</button>
                 </div>
             </div>
 
             <!-- Éditeur WYSIWYG -->
             <div class="p-6 md:p-10 min-h-[500px] bg-white overflow-y-auto">
-                <div id="aruEditor" contenteditable="true" class="aru-content outline-none focus:ring-1 focus:ring-aru-500 rounded-lg p-4 min-h-[450px]">
+                <div id="aruEditor" contenteditable="true" class="aru-content outline-none focus:ring-2 focus:ring-aru-500 rounded-lg p-4 min-h-[450px]">
                     <p class="text-slate-400 italic text-center py-16">
                         Le document transformé s'affichera ici.<br>
                         Vous pourrez relire le texte, le modifier et vérifier la mise en page avant exportation.
@@ -367,12 +378,11 @@
                 </div>
             </div>
 
-            <!-- Section Exportation (PDF, DOCX, Impression) -->
             <div class="bg-slate-50 p-6 border-t border-slate-200 space-y-4 no-print">
                 <div class="flex items-center justify-between flex-wrap gap-4">
                     <div>
                         <h4 class="text-sm font-bold text-slate-800">Étape 3 : Exportation & Téléchargement</h4>
-                        <p class="text-xs text-slate-500">Téléchargez directement votre document adapté au format PDF ou Word (.docx).</p>
+                        <p class="text-xs text-slate-500">Téléchargez votre document adapté au format PDF ou Word (.docx).</p>
                     </div>
                 </div>
 
@@ -381,7 +391,7 @@
                         <i class="fa-solid fa-trash"></i> Effacer tout
                     </button>
                     <button onclick="printNativePdf()" class="px-4 py-2 text-xs bg-slate-700 hover:bg-slate-800 text-white font-medium rounded-lg transition flex items-center gap-1.5" title="Imprimer ou enregistrer au format PDF via le navigateur">
-                        <i class="fa-solid fa-print"></i> Imprimer
+                        <i class="fa-solid fa-print"></i> Imprimer / PDF système
                     </button>
                     <button onclick="exportToPdf()" class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2 text-sm">
                         <i class="fa-solid fa-file-pdf text-lg"></i> Télécharger en PDF (.pdf)
@@ -395,7 +405,6 @@
 
     </main>
 
-    <!-- Modal Clé API Gemini -->
     <div id="apiKeyModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div class="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -406,17 +415,16 @@
             </div>
             
             <p class="text-xs text-slate-600 leading-relaxed">
-                L'application fonctionne <strong>directement pour tous les utilisateurs</strong> sans qu'aucune clé ne soit obligatoire. Si vous disposez de votre propre clé personnelle Google AI Studio, vous pouvez la renseigner ici.
+                L'application fonctionne <strong>100% sans clé API</strong> pour tous les fichiers (Word, PDF, Images avec OCR local). Une clé Gemini personnelle permet d'accélérer l'analyse de documents complexes.
             </p>
 
             <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800 space-y-1.5">
                 <p class="font-semibold flex items-center gap-1">
-                    <i class="fa-solid fa-circle-info text-blue-600"></i> Comment obtenir une clé API gratuite ?
+                    <i class="fa-solid fa-circle-info text-blue-600"></i> Obtenir une clé clé API gratuite :
                 </p>
                 <ol class="list-decimal list-inside space-y-1 text-[11px] text-blue-700">
-                    <li>Rendez-vous sur <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="underline font-bold hover:text-blue-900">Google AI Studio <i class="fa-solid fa-up-right-from-square text-[9px]"></i></a>.</li>
-                    <li>Connectez-vous avec votre compte Google.</li>
-                    <li>Cliquez sur <strong>"Create API key"</strong> et collez la clé ci-dessous.</li>
+                    <li>Allez sur <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="underline font-bold hover:text-blue-900">Google AI Studio <i class="fa-solid fa-up-right-from-square text-[9px]"></i></a>.</li>
+                    <li>Connectez-vous et cliquez sur <strong>"Create API key"</strong>.</li>
                 </ol>
             </div>
 
@@ -448,19 +456,124 @@
         </div>
     </div>
 
-    <!-- Conteneur des Toasts -->
+    <!-- Conteneur des Notifications Toasts -->
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none no-print"></div>
 
     <script>
-        // PDF.js worker setup
+        
+        // Configuration PDF.js Worker
         if (typeof pdfjsLib !== 'undefined') {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
         }
 
-        // Variables globales
         let loadedFiles = [];
         let customApiKey = localStorage.getItem('GEMINI_API_KEY') || "";
         let currentTab = 'file';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initDropzone();
+            updateApiKeyStatusDot();
+        });
+
+        function initDropzone() {
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+
+            if (!dropzone || !fileInput) return;
+
+            // Déclenchement propre de la sélection de fichier
+            dropzone.addEventListener('click', (e) => {
+                if (e.target !== fileInput) {
+                    fileInput.click();
+                }
+            });
+
+            // Effets de glisser-déposer
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add('dropzone-active');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove('dropzone-active');
+                }, false);
+            });
+
+            // Dépôt de fichiers
+            dropzone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                if (dt && dt.files && dt.files.length > 0) {
+                    handleFiles(Array.from(dt.files));
+                }
+            });
+
+            // Modification de l'input file
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    handleFiles(Array.from(e.target.files));
+                    fileInput.value = ''; // Réinitialiser pour pouvoir ré-importer le même fichier
+                }
+            });
+        }
+
+        function handleFiles(files) {
+            // Filtrage et ajout des fichiers
+            const validFiles = files.filter(f => f.size > 0);
+            if (validFiles.length === 0) {
+                showToast("Fichier vide ou invalide.", "warning");
+                return;
+            }
+            loadedFiles = [...loadedFiles, ...validFiles];
+            renderFileList();
+            showToast(`${validFiles.length} fichier(s) ajouté(s).`, "info");
+        }
+
+        function removeFile(index) {
+            loadedFiles.splice(index, 1);
+            renderFileList();
+        }
+
+        function clearFileList() {
+            loadedFiles = [];
+            renderFileList();
+        }
+
+        function renderFileList() {
+            const container = document.getElementById('fileListContainer');
+            const list = document.getElementById('fileList');
+
+            if (loadedFiles.length === 0) {
+                container.classList.add('hidden');
+                list.innerHTML = '';
+                return;
+            }
+
+            container.classList.remove('hidden');
+            list.innerHTML = loadedFiles.map((file, i) => `
+                <div class="flex items-center justify-between p-2.5 bg-slate-100 rounded-lg text-xs">
+                    <div class="flex items-center gap-2 truncate">
+                        <i class="fa-solid ${getFileIcon(file.name)} text-aru-600 text-sm"></i>
+                        <span class="font-medium text-slate-700 truncate">${file.name}</span>
+                        <span class="text-slate-400 text-[10px]">(${Math.round(file.size / 1024)} KB)</span>
+                    </div>
+                    <button onclick="removeFile(${i})" class="text-slate-400 hover:text-red-500 p-1"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            if (ext === 'pdf') return 'fa-file-pdf';
+            if (['doc', 'docx'].includes(ext)) return 'fa-file-word';
+            if (['png', 'jpg', 'jpeg', 'heic', 'heif'].includes(ext)) return 'fa-file-image';
+            return 'fa-file-lines';
+        }
 
         function switchImportTab(tab) {
             currentTab = tab;
@@ -482,14 +595,52 @@
             }
         }
 
-        function updateApiKeyStatusDot() {
-            const dot = document.getElementById('apiKeyStatusDot');
-            if (!dot) return;
-            dot.className = 'w-2 h-2 rounded-full bg-emerald-500 inline-block';
-            dot.title = customApiKey ? "Clé personnalisée active" : "Prêt à l'emploi (mode automatique)";
+        function applyLocalAruFormatting(rawTextOrHtml) {
+            if (!rawTextOrHtml) return '';
+
+            let html = rawTextOrHtml;
+
+            // Si c'est du texte brut sans balises, structurer en paragraphes
+            if (!html.includes('<p>') && !html.includes('<div>') && !html.includes('<h1>')) {
+                html = html.split(/\n\s*\n/).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+            }
+
+            const optConsignes = document.getElementById('optConsignes')?.checked ?? true;
+            const optEspaces = document.getElementById('optEspaces')?.checked ?? true;
+
+            // 1. Détection & mise en gras des verbes d'action
+            if (optConsignes) {
+                const actionVerbs = [
+                    'Surligne', 'Souligne', 'Calcule', 'Entoure', 'Complète', 'Relie',
+                    'Repère', 'Explique', 'Justifie', 'Lis', 'Réponds', 'Choisis', 'Écris',
+                    'Surligner', 'Souligner', 'Calculer', 'Entourer', 'Compléter', 'Relier',
+                    'Repérer', 'Expliquer', 'Justifier', 'Lire', 'Répondre', 'Choisir', 'Écrire',
+                    'Traduis', 'Compare', 'Colorie', 'Associe', 'Numérote', 'Recopie', 'Classe',
+                    'Barre', 'Encadre', 'Cites', 'Donne', 'Trouve', 'Remplace', 'Modifie', 'Analyse'
+                ];
+
+                actionVerbs.forEach(verb => {
+                    const regex = new RegExp(`\\b(${verb})\\b(?![^<]*>)`, 'gi');
+                    html = html.replace(regex, '<strong>$1</strong>');
+                });
+            }
+
+            // 2. Remplacement des zones de réponse réduites par un bloc aéré ARU
+            if (optEspaces) {
+                html = html.replace(/(\.{3,}|_{3,}|–{3,}|-{3,})/g, '<div class="aru-answer-space"></div>');
+                html = html.replace(/(<div class="aru-answer-space"><\/div>\s*)+/g, '<div class="aru-answer-space"></div>');
+            }
+
+            // 3. Suppression des césures de mots
+            html = html.replace(/(\w+)-\s*\n\s*(\w+)/g, '$1$2');
+
+            return html;
         }
 
         async function processInputData() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const aruEditor = document.getElementById('aruEditor');
+
             if (currentTab === 'text') {
                 const text = document.getElementById('directTextInput').value.trim();
                 if (!text) {
@@ -498,18 +649,19 @@
                 }
                 
                 loadingOverlay.classList.remove('hidden');
-                updateProgress(50, "Adaptation du texte...", "Mise en page ARU...");
+                updateProgress(40, "Adaptation de la typographie...", "Application des normes ARU Arial 14pt...");
 
-                let formattedHtml = text.split('\n\n').map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
-                
-                try {
-                    formattedHtml = await adaptHtmlWithGemini(formattedHtml);
-                } catch (e) {
-                    formattedHtml = applyLocalAruFormatting(formattedHtml);
+                let formattedHtml = applyLocalAruFormatting(text);
+                if (customApiKey) {
+                    try {
+                        formattedHtml = await adaptHtmlWithGemini(text);
+                    } catch (e) {
+                        console.warn("Utilisation de la mise en page locale.");
+                    }
                 }
 
                 aruEditor.innerHTML = formattedHtml;
-                updateProgress(100, "Terminé !", "Texte prêt.");
+                updateProgress(100, "Terminé !", "Document adapté avec succès.");
                 setTimeout(() => {
                     loadingOverlay.classList.add('hidden');
                     document.getElementById('editor-section').scrollIntoView({ behavior: 'smooth' });
@@ -525,23 +677,164 @@
             }
         }
 
+        async function processDocuments() {
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const aruEditor = document.getElementById('aruEditor');
+
+            loadingOverlay.classList.remove('hidden');
+            updateProgress(15, "Analyse des fichiers...", "Initialisation du traitement...");
+
+            let aggregatedHtml = "";
+
+            try {
+                for (let i = 0; i < loadedFiles.length; i++) {
+                    const file = loadedFiles[i];
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    const percent = 15 + Math.round(((i + 1) / loadedFiles.length) * 75);
+                    updateProgress(percent, `Traitement de ${file.name}...`, "Extraction et mise en forme...");
+
+                    if (['doc', 'docx'].includes(ext)) {
+                        // Extraction Word avec Mammoth.js
+                        const arrayBuffer = await file.arrayBuffer();
+                        const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+                        let extractedHtml = result.value || "<p>Contenu vide.</p>";
+                        
+                        if (customApiKey) {
+                            try {
+                                extractedHtml = await adaptHtmlWithGemini(extractedHtml);
+                            } catch (e) {
+                                extractedHtml = applyLocalAruFormatting(extractedHtml);
+                            }
+                        } else {
+                            extractedHtml = applyLocalAruFormatting(extractedHtml);
+                        }
+                        aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + extractedHtml;
+
+                    } else if (ext === 'pdf') {
+                        // Extraction PDF (texte ou OCR)
+                        updateProgress(percent, `Lecture du PDF ${file.name}...`, "Extraction du texte...");
+                        let pdfText = await extractPdfText(file);
+                        let pdfHtml = applyLocalAruFormatting(pdfText);
+                        aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + pdfHtml;
+
+                    } else if (['png', 'jpg', 'jpeg', 'heic', 'heif'].includes(ext)) {
+                        // Images / HEIC / Manuscrits
+                        let fileToProcess = file;
+                        if (['heic', 'heif'].includes(ext)) {
+                            updateProgress(percent, "Conversion de l'image HEIC...", "Décodage du format photo...");
+                            const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+                            fileToProcess = new File([Array.isArray(blob) ? blob[0] : blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+                        }
+
+                        if (customApiKey) {
+                            // OCR via Gemini Vision
+                            const base64 = await fileToBase64(fileToProcess);
+                            const visionResult = await callGeminiVision(base64, fileToProcess.type || "image/jpeg");
+                            aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + visionResult;
+                        } else {
+                            // OCR 100% Local via Tesseract.js
+                            updateProgress(percent, "OCR Local en cours...", "Reconnaissance de texte sur l'image...");
+                            const localOcrText = await runLocalOcr(fileToProcess);
+                            const formattedOcr = applyLocalAruFormatting(localOcrText);
+                            aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + formattedOcr;
+                        }
+                    } else {
+                        // Fichier texte simple
+                        const textContent = await file.text();
+                        aggregatedHtml += `<h1>${file.name.replace(/\.[^/.]+$/, "")}</h1>` + applyLocalAruFormatting(textContent);
+                    }
+                }
+
+                aruEditor.innerHTML = aggregatedHtml || "<p>Aucun contenu exploitable extrait.</p>";
+                updateProgress(100, "Terminé !", "Document prêt.");
+                showToast("Document adapté au format ARU avec succès !", "success");
+
+            } catch (err) {
+                console.error("Erreur de traitement :", err);
+                showToast(err.message || "Erreur lors du traitement du document.", "error");
+            } finally {
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                    document.getElementById('editor-section').scrollIntoView({ behavior: 'smooth' });
+                }, 500);
+            }
+        }
+
+        /* Extraction du texte des PDF avec fallback OCR local si PDF scanné */
+        async function extractPdfText(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = "";
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(" ").trim();
+                
+                if (pageText.length > 20) {
+                    fullText += `<p>${pageText}</p>`;
+                } else {
+                    // Si la page est une image scannée, faire un rendu Canvas et OCR
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    const pageImageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+                    
+                    const ocrPageText = await runLocalOcr(pageImageBlob);
+                    fullText += `<p>${ocrPageText}</p>`;
+                }
+            }
+
+            return fullText || "<p>Aucun texte pu être extrait du PDF.</p>";
+        }
+
+        /* OCR local dans le navigateur via Tesseract.js */
+        async function runLocalOcr(imageSource) {
+            try {
+                if (typeof Tesseract === 'undefined') {
+                    throw new Error("Moteur OCR local non chargé.");
+                }
+                const result = await Tesseract.recognize(imageSource, 'fra');
+                return result?.data?.text || "Aucun texte détecté sur l'image.";
+            } catch (err) {
+                console.warn("Échec OCR Tesseract local:", err);
+                return "Erreur d'extraction OCR de l'image.";
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function updateProgress(percent, status, detail) {
+            document.getElementById('progressBar').style.width = percent + '%';
+            if (status) document.getElementById('loadingStatus').innerText = status;
+            if (detail) document.getElementById('loadingDetail').innerText = detail;
+        }
+
         async function callGeminiVision(base64Image, mimeType) {
             const apiKey = customApiKey ? customApiKey.trim() : "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+            if (!apiKey) return applyLocalAruFormatting("Note OCR locale active.");
 
-            const optConsignes = document.getElementById('optConsignes').checked;
-            const optEspaces = document.getElementById('optEspaces').checked;
-            const optKeepImages = document.getElementById('optKeepImages').checked;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
             const promptSystem = `
-            Tu es un expert en orthopédagogie et Aménagements Raisonnables Universels (ARU) pour les élèves à besoins spécifiques.
-            Réalise un OCR haute précision de ce document et retourne le contenu sous forme de HTML structuré :
-            1. **Consignes et Verbes** : ${optConsignes ? 'Mets IMPÉRATIVEMENT en GRAS (balise <strong>) les mots-clés et verbes d\'action (ex: <strong>Surligne</strong>, <strong>Calcule</strong>, <strong>Trouve</strong>, <strong>Entoure</strong>, <strong>Explique</strong>, <strong>Justifie</strong>, <strong>Coche</strong>, <strong>Lis</strong>).' : ''}
-            2. **Structure** : Organise avec des titres <h1>, <h2>, <h3> mis en évidence en <strong>gras</strong>.
-            3. **Agrandissement réponses** : ${optEspaces ? 'Si les espaces de réponse sont trop étroits, insère la balise : `<div class="aru-answer-space"></div>`.' : ''}
-            4. **Sens et Mots** : Respecte scrupuleusement le texte. INTERDICTION de couper les mots en fin de ligne.
-            5. **Tableaux/Images** : ${optKeepImages ? 'Conserve la structure des tableaux (<table>).' : ''}
-            6. **Format** : Renvoie UNIQUEMENT le code HTML propre sans balises Markdown.
+            Tu es un expert en orthopédagogie et Aménagements Raisonnables Universels (ARU).
+            Effectue un OCR précis de cette image/document et retourne du HTML bien structuré :
+            1. Consignes et Verbes : Mets IMPÉRATIVEMENT en GRAS (balise <strong>) tous les mots-clés et verbes d'action.
+            2. Structure : Utilise des titres <h1>, <h2>, <h3>.
+            3. Agrandissement réponses : Insère <div class="aru-answer-space"></div> là où il y a des lignes de réponse étables/pointillés.
+            4. Interdiction absolue de couper les mots en fin de ligne.
+            5. Renvoie UNIQUEMENT le code HTML propre sans balises markdown.
             `;
 
             const payload = {
@@ -561,43 +854,33 @@
             });
 
             if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(`Analyse d'image indisponible (${response.status}) : ${errData.error?.message || "Erreur de traitement"}`);
+                throw new Error("Échec de l'appel Gemini.");
             }
 
             const result = await response.json();
             let htmlText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!htmlText) throw new Error("Aucun texte exploitable renvoyé par l'IA.");
-
-            return htmlText.replace(/```html/gi, '').replace(/```/g, '').trim();
+            return (htmlText || "").replace(/```html/gi, '').replace(/```/g, '').trim();
         }
 
-        async function adaptHtmlWithGemini(rawHtml) {
+        async function adaptHtmlWithGemini(rawText) {
             const apiKey = customApiKey ? customApiKey.trim() : "";
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+            if (!apiKey) return applyLocalAruFormatting(rawText);
 
-            const promptSystem = `
-            Transforme ce document HTML aux normes ARU :
-            1. Verbes d'action des consignes en <strong>gras</strong>.
-            2. Titres <h1>, <h2> mis en gras.
-            3. Remplace les espaces de réponse trop étroits par <div class="aru-answer-space"></div>.
-            4. Interdiction de couper les mots.
-            5. Renvoie UNIQUEMENT le code HTML nettoyé.
-            `;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: promptSystem + "\n\nHTML:\n" + rawHtml }] }]
-            };
+            const promptSystem = `Transforme ce texte aux normes ARU en HTML : verbes de consignes en <strong>, titres mis en valeur, espaces de réponse agrandis avec <div class="aru-answer-space"></div>. Renvoie uniquement le HTML.`;
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    contents: [{ role: "user", parts: [{ text: promptSystem + "\n\nTEXTE:\n" + rawText }] }]
+                })
             });
 
-            if (!response.ok) throw new Error("Analyse IA indisponible, basculement en mode local.");
+            if (!response.ok) return applyLocalAruFormatting(rawText);
             const result = await response.json();
-            let htmlText = result.candidates?.[0]?.content?.parts?.[0]?.text || rawHtml;
+            let htmlText = result.candidates?.[0]?.content?.parts?.[0]?.text || rawText;
             return htmlText.replace(/```html/gi, '').replace(/```/g, '').trim();
         }
 
@@ -611,31 +894,26 @@
         }
 
         function clearEditor() {
-            aruEditor.innerHTML = '<p class="text-slate-400 italic text-center py-16">L\'éditeur est vide. Importez un document ci-dessus.</p>';
+            const aruEditor = document.getElementById('aruEditor');
+            aruEditor.innerHTML = '<p class="text-slate-400 italic text-center py-16">L\'éditeur est vide. Importez un document ou collez du texte ci-dessus.</p>';
             showToast("L'éditeur a été réinitialisé.", "info");
         }
 
-        // EXPORTATION PDF FONCTIONNELLE ET DIRECTE
         async function exportToPdf() {
+            const aruEditor = document.getElementById('aruEditor');
             const content = aruEditor.innerHTML;
-            if (!content || content.includes("Le document transformé apparaîtra ici") || content.trim() === "") {
-                showToast("Aucun contenu à exporter. Veuillez d'abord transformer un document.", "warning");
+
+            if (!content || content.includes("Le document transformé s'affichera ici") || content.trim() === "") {
+                showToast("Aucun contenu à exporter.", "warning");
                 return;
             }
 
-            if (typeof html2pdf === 'undefined') {
-                showToast("Bibliothèque PDF indisponible. Lancement de l'impression natif...", "warning");
-                window.print();
-                return;
-            }
+            showToast("Génération du fichier PDF...", "info");
 
-            showToast("Génération du fichier PDF en cours...", "info");
-
-            // Isolation du conteneur pour le rendu html2pdf
             const container = document.createElement('div');
             container.style.position = 'fixed';
-            container.style.left = '0';
             container.style.top = '0';
+            container.style.left = '0';
             container.style.width = '750px';
             container.style.padding = '30px';
             container.style.backgroundColor = '#ffffff';
@@ -655,17 +933,20 @@
                 margin:       [15, 15, 15, 15],
                 filename:     'Document_Adapte_ARU.pdf',
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, logging: false, windowWidth: 800 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
             };
 
             try {
-                await html2pdf().set(opt).from(container).save();
-                showToast("Le document PDF a été généré et téléchargé avec succès !", "success");
+                if (typeof html2pdf !== 'undefined') {
+                    await html2pdf().set(opt).from(container).save();
+                    showToast("PDF téléchargé avec succès !", "success");
+                } else {
+                    window.print();
+                }
             } catch (err) {
-                console.error("Erreur html2pdf :", err);
-                showToast("Basculement vers la boîte de dialogue d'impression/PDF du système...", "info");
+                console.error("Erreur PDF :", err);
                 window.print();
             } finally {
                 if (container.parentElement) {
@@ -675,9 +956,11 @@
         }
 
         function exportDocxAction() {
+            const aruEditor = document.getElementById('aruEditor');
             const htmlContent = aruEditor.innerHTML;
-            if (!htmlContent || htmlContent.includes("Le document transformé apparaîtra ici")) {
-                showToast("Aucun contenu à exporter. Veuillez d'abord transformer un document.", "warning");
+
+            if (!htmlContent || htmlContent.includes("Le document transformé s'affichera ici")) {
+                showToast("Aucun contenu à exporter.", "warning");
                 return;
             }
             exportToDocx(htmlContent);
@@ -722,7 +1005,7 @@
                                 for (let i = 0; i < 4; i++) {
                                     docChildren.push(new Paragraph({
                                         spacing: { before: 120, after: 120 },
-                                        border: { bottom: { color: "94A3B8", space: 1, value: "single", size: 6 } },
+                                        border: { bottom: { color: "0369A1", space: 1, value: "single", size: 6 } },
                                         children: [new TextRun({ text: "", font: "Arial", size: 28 })]
                                     }));
                                 }
@@ -764,24 +1047,25 @@
                     return;
                 }
             } catch (err) {
-                console.warn("Docx.js indisponible, exportation au format Word HTML...", err);
+                console.warn("Basculement Word HTML...", err);
             }
 
             exportToWordHtml(htmlContent);
         }
 
         function exportToWordHtml(htmlContent) {
-            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document ARU</title><style>body { font-family: Arial, sans-serif; font-size: 14pt; line-height: 1.5; color: #1e293b; } .aru-answer-space { border: 2px dashed #94a3b8; height: 100px; margin: 15px 0; } h1 { font-size: 20pt; font-weight: bold; color: #0c4a6e; } h2 { font-size: 17pt; font-weight: bold; color: #0369a1; } h3 { font-size: 15pt; font-weight: bold; color: #0284c7; } strong { font-weight: bold; background-color: #fef08a; }</style></head><body>";
+            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document ARU</title><style>body { font-family: Arial, sans-serif; font-size: 14pt; line-height: 1.5; color: #1e293b; } .aru-answer-space { border: 2px dashed #0369a1; height: 100px; margin: 15px 0; } h1 { font-size: 20pt; font-weight: bold; color: #0c4a6e; } h2 { font-size: 17pt; font-weight: bold; color: #0369a1; } h3 { font-size: 15pt; font-weight: bold; color: #0284c7; } strong { font-weight: bold; background-color: #fef08a; }</style></head><body>";
             const footer = "</body></html>";
             const blob = new Blob(['\ufeff', header + htmlContent + footer], { type: 'application/msword' });
             saveAs(blob, "Document_Adapte_ARU.docx");
-            showToast("Fichier Word généré en mode secours HTML.", "info");
+            showToast("Fichier Word généré.", "info");
         }
 
         function printNativePdf() {
-            const htmlContent = aruEditor.innerHTML;
-            if (!htmlContent || htmlContent.includes("Le document transformé apparaîtra ici") || htmlContent.trim() === "") {
-                showToast("Aucun contenu à imprimer. Veuillez d'abord transformer un document.", "warning");
+            const aruEditor = document.getElementById('aruEditor');
+            const content = aruEditor.innerHTML;
+            if (!content || content.includes("Le document transformé s'affichera ici") || content.trim() === "") {
+                showToast("Aucun contenu à imprimer.", "warning");
                 return;
             }
             window.print();
@@ -789,6 +1073,7 @@
 
         function openApiKeyModal() {
             document.getElementById('apiKeyModal').classList.remove('hidden');
+            document.getElementById('apiKeyInput').value = customApiKey;
             document.getElementById('testKeyFeedback').classList.add('hidden');
         }
 
@@ -808,28 +1093,43 @@
             }
         }
 
+        function updateApiKeyStatusDot() {
+            const dot = document.getElementById('apiKeyStatusDot');
+            if (!dot) return;
+            dot.className = customApiKey ? "w-2 h-2 rounded-full bg-emerald-500 inline-block" : "w-2 h-2 rounded-full bg-blue-400 inline-block";
+            dot.title = customApiKey ? "Clé API personnalisée active" : "Mode direct actif (sans clé)";
+        }
+
         async function testApiKey() {
             const feedback = document.getElementById('testKeyFeedback');
             const key = document.getElementById('apiKeyInput').value.trim();
 
+            if (!key) {
+                feedback.className = 'mt-2 text-xs p-2.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200';
+                feedback.innerHTML = 'Veuillez saisir une clé à tester.';
+                feedback.classList.remove('hidden');
+                return;
+            }
+
             feedback.className = 'mt-2 text-xs p-2.5 rounded-lg bg-slate-100 text-slate-700 flex items-center gap-2';
-            feedback.innerHTML = '<i class="fa-solid fa-spinner animate-spin text-aru-600"></i> Test de la clé...';
+            feedback.innerHTML = '<i class="fa-solid fa-spinner animate-spin text-aru-600"></i> Test de connexion...';
+            feedback.classList.remove('hidden');
 
             try {
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${key}`;
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
                 const res = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: "OK" }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "Test OK" }] }] })
                 });
 
                 if (res.ok) {
                     feedback.className = 'mt-2 text-xs p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-medium flex items-center gap-2';
-                    feedback.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i> Clé API valide ! Connexion Gemini réussie.';
+                    feedback.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600 text-sm"></i> Clé valide ! Connexion réussie.';
                 } else {
                     const errJson = await res.json().catch(() => ({}));
                     feedback.className = 'mt-2 text-xs p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-800 flex items-start gap-2';
-                    feedback.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600 text-sm mt-0.5"></i> <div><strong>Clé invalide :</strong> ${errJson.error?.message || res.statusText}</div>`;
+                    feedback.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600 text-sm mt-0.5"></i> <div><strong>Invalide :</strong> ${errJson.error?.message || res.statusText}</div>`;
                 }
             } catch (err) {
                 feedback.className = 'mt-2 text-xs p-2.5 rounded-lg bg-red-50 border border-red-200 text-red-800 flex items-center gap-2';
@@ -843,7 +1143,7 @@
             localStorage.setItem('GEMINI_API_KEY', key);
             updateApiKeyStatusDot();
             closeApiKeyModal();
-            showToast("Clé API Gemini enregistrée avec succès !", "success");
+            showToast("Clé API enregistrée !", "success");
         }
 
         function clearApiKey() {
@@ -852,7 +1152,40 @@
             localStorage.removeItem('GEMINI_API_KEY');
             updateApiKeyStatusDot();
             document.getElementById('testKeyFeedback').classList.add('hidden');
-            showToast("La clé API a été réinitialisée.", "info");
+            showToast("Réinitialisation effectuée.", "info");
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            const bgColors = {
+                success: 'bg-emerald-600 text-white',
+                error: 'bg-red-600 text-white',
+                warning: 'bg-amber-500 text-white',
+                info: 'bg-slate-800 text-white'
+            };
+            const icons = {
+                success: 'fa-circle-check',
+                error: 'fa-circle-xmark',
+                warning: 'fa-triangle-exclamation',
+                info: 'fa-circle-info'
+            };
+
+            toast.className = `pointer-events-auto p-3.5 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2.5 transition-all duration-300 transform translate-y-2 opacity-0 ${bgColors[type] || bgColors.info}`;
+            toast.innerHTML = `<i class="fa-solid ${icons[type] || icons.info} text-base"></i><span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
         }
     </script>
 </body>
