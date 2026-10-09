@@ -1,652 +1,870 @@
 <!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8"><title>Adaptateur ARU</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<style>
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mut:#5b6572;--ac:#1f5fbf;--bd:#d5dae1}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15181c;--card:#1f2328;--tx:#e8ebef;--mut:#9aa4b0;--ac:#6ea4ff;--bd:#38404a}}
-:root[data-theme="dark"]{--bg:#15181c;--card:#1f2328;--tx:#e8ebef;--mut:#9aa4b0;--ac:#6ea4ff;--bd:#38404a}
-html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,Arial,sans-serif}
-main{max-width:860px;margin:0 auto;padding:16px}
-h1{font-size:22px;margin:4px 0}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin:12px 0}
-.drop{border:2px dashed var(--bd);border-radius:12px;padding:24px;text-align:center;cursor:pointer;color:var(--mut)}
-.drop:focus,.drop.on{border-color:var(--ac)}
-button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--ac);background:var(--ac);color:#fff;cursor:pointer}
-button.sec{background:transparent;color:var(--ac)}button:disabled{opacity:.5;cursor:default}
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-label{display:inline-flex;gap:6px;align-items:center}
-#files{color:var(--mut);font-size:14px;margin-top:8px}
-#st,#st2{color:var(--mut);min-height:1.5em}
-#st[role="status"],#st2[role="status"]{display:inline-block}
-#ed{background:#fff;color:#000;border:1px solid var(--bd);border-radius:8px;padding:20px;min-height:200px;font:14pt/1.5 Arial,Helvetica,sans-serif;overflow-x:auto;word-break:normal;overflow-wrap:normal}
-#ed h1,#ed h2{font:bold 14pt/1.5 Arial,Helvetica,sans-serif;margin:.8em 0 .2em}
-#ed p{margin:0 0 .6em}
-.ans{margin:0 0 .8em;user-select:none}.ans i{display:block;height:2.1em;border-bottom:1px solid #777}
-#ed table{border-collapse:collapse;width:100%;table-layout:fixed;margin:0 0 .8em}#ed td{border:1px solid #444;padding:4px 6px;vertical-align:top;overflow-wrap:break-word}.fig{margin:0 0 .8em;text-align:center}.fig img{max-width:100%;height:auto;border-radius:6px;border:1px solid var(--bd)}
-</style></head><body><main>
-<h1>Adaptateur ARU</h1>
-<p style="color:var(--mut);margin:0">Word, PDF, image, capture, photo (HEIC) ou manuscrit → texte modifiable en Arial 14, interligne 1,5, avec espaces de réponse.</p>
-<div class="card">
-<div class="drop" id="drop" tabindex="0" role="button" aria-label="Ajouter des fichiers">Déposez vos fichiers ici ou cliquez pour choisir<br><small>.docx · .pdf · .jpg/.png/.webp · .heic · photos de manuscrits</small></div>
-<input id="inp" type="file" multiple hidden accept=".docx,.pdf,.heic,.heif,image/*">
-<div id="files" aria-live="polite">Aucun fichier</div>
-<div class="row" style="margin-top:10px"><button id="go" type="button" disabled>Adapter le document</button><button id="clear" type="button" class="sec">Effacer</button><span id="st" role="status" aria-live="polite" aria-atomic="true"></span></div>
-</div>
-<div class="card">
-<div class="row" style="justify-content:space-between"><strong>Texte adapté (modifiable)</strong>
-<span class="row"><button class="sec" id="addans" type="button">+ Zone de réponse</button><small style="color:var(--mut)">Double-clic sur une zone ou une image pour la supprimer</small></span></div>
-<div id="ed" contenteditable="true" spellcheck="true" lang="fr" style="margin-top:10px"></div>
-</div>
-<div class="card row"><strong>Exporter en :</strong>
-<label><input type="checkbox" id="xd" checked> Word (.docx)</label>
-<label><input type="checkbox" id="xp"> PDF</label>
-<button id="exp" type="button">Exporter</button><span id="st2" role="status" aria-live="polite" aria-atomic="true"></span></div>
-</main>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
-<script>
-const $ = (selector) => document.querySelector(selector);
-const state = { files: [], active: false };
-const esc = (value) => String(value ?? '').replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]));
-const inlineMarkup = (value) => esc(value).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-const setStatus = (id, message) => { const el = $(id); if (el) el.textContent = message; };
-const getExt = (file) => (file.name.split('.').pop() || '').toLowerCase();
-const isSupportedFile = (file) => {
-  const ext = getExt(file);
-  const okExt = ['docx', 'pdf', 'png', 'jpg', 'jpeg', 'webp', 'heic', 'heif'];
-  return okExt.includes(ext) || file.type.startsWith('image/');
-};
-const drop = $('#drop'), inp = $('#inp');
-
-function updateFileList() {
-  const filesText = state.files.length ? state.files.map((f) => f.name).join(' · ') : 'Aucun fichier';
-  $('#files').textContent = filesText;
-  $('#go').disabled = !state.files.length || state.active;
-}
-
-function clearFiles() {
-  state.files = [];
-  inp.value = '';
-  $('#ed').innerHTML = '';
-  updateFileList();
-  setStatus('#st', '');
-}
-
-function add(list) {
-  const next = [...list].filter((file) => isSupportedFile(file));
-  const seen = new Set(state.files.map((file) => `${file.name}-${file.size}-${file.lastModified}`));
-  const unique = next.filter((file) => {
-    const key = `${file.name}-${file.size}-${file.lastModified}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  if (!unique.length) {
-    setStatus('#st', 'Aucun fichier valide ajouté.');
-    return;
-  }
-
-  state.files.push(...unique);
-  updateFileList();
-  setStatus('#st', `${unique.length} fichier${unique.length > 1 ? 's' : ''} ajouté${unique.length > 1 ? 's' : ''}.`);
-}
-
-drop.onclick = () => inp.click();
-drop.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); inp.click(); } };
-drop.ondragover = (event) => { event.preventDefault(); drop.classList.add('on'); };
-drop.ondragleave = () => drop.classList.remove('on');
-drop.ondrop = (event) => { event.preventDefault(); drop.classList.remove('on'); add(event.dataTransfer.files); };
-inp.onchange = () => { add(inp.files); inp.value = ''; };
-$('#clear').onclick = clearFiles;
-
-const b2u = (blob) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = () => reject(new Error('Lecture du fichier impossible.'));
-  reader.readAsDataURL(blob);
-});
-
-const d2b = (dataUrl) => {
-  const [header, body] = dataUrl.split(',');
-  const mimeMatch = header.match(/:(.*?);/);
-  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-  return new Blob([Uint8Array.from(atob(body), (char) => char.charCodeAt(0))], { type: mime });
-};
-
-async function toJpeg(blob) {
-  const objectUrl = URL.createObjectURL(blob);
-  try {
-    const image = new Image();
-    image.src = objectUrl;
-    await image.decode();
-    const scale = Math.min(1, 1800 / Math.max(image.width, image.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(image.width * scale));
-    canvas.height = Math.max(1, Math.round(image.height * scale));
-    const context = canvas.getContext('2d');
-    context.fillStyle = '#fff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Conversion JPEG impossible.')), 'image/jpeg', 0.88));
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-async function crop(blob, box) {
-  const objectUrl = URL.createObjectURL(blob);
-  try {
-    const image = new Image();
-    image.src = objectUrl;
-    await image.decode();
-    const [x0, y0, x1, y1] = box.map((value) => Math.max(0, Math.min(1, Number(value) || 0)));
-    const width = Math.max(1, (x1 - x0) * image.width);
-    const height = Math.max(1, (y1 - y0) * image.height);
-    const x = x0 * image.width;
-    const y = y0 * image.height;
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(width);
-    canvas.height = Math.round(height);
-    const context = canvas.getContext('2d');
-    context.drawImage(image, x, y, width, height, 0, 0, canvas.width, canvas.height);
-    return await new Promise((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error('Découpage de l’image impossible.')), 'image/jpeg', 0.9));
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-async function items(file) {
-  const ext = getExt(file);
-
-  if (ext === 'heic' || ext === 'heif' || /hei[cf]/.test(file.type || '')) {
-    if (typeof window.heic2any === 'undefined') throw new Error('Le support HEIC est indisponible.');
-    const converted = await window.heic2any({ blob: file, toType: 'image/jpeg', quality: 0.9 });
-    const blob = Array.isArray(converted) ? converted[0] : converted;
-    return [{ img: await toJpeg(blob) }];
-  }
-
-  if (file.type.startsWith('image/')) {
-    return [{ img: await toJpeg(file) }];
-  }
-
-  if (ext === 'pdf') {
-    if (!window.pdfjsLib) throw new Error('pdf.js est introuvable.');
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const documentPdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-    const pages = [];
-    for (let index = 1; index <= Math.min(documentPdf.numPages, 15); index += 1) {
-      const page = await documentPdf.getPage(index);
-      const viewport = page.getViewport({ scale: 1.8 });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const context = canvas.getContext('2d');
-      await page.render({ canvasContext: context, viewport }).promise;
-      pages.push({ img: await new Promise((resolve, reject) => { canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Page PDF non rendue.')), 'image/jpeg', 0.88); }) });
-    }
-    return pages;
-  }
-
-  if (ext === 'docx') {
-    if (!window.mammoth) throw new Error('mammoth.js est introuvable.');
-    const rawImages = [];
-    const result = await window.mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() }, {
-      convertImage: window.mammoth.images.imgElement(async (image) => {
-        const dataUrl = 'data:' + image.contentType + ';base64,' + await image.read('base64');
-        rawImages.push(dataUrl);
-        return { src: dataUrl };
-      })
-    });
-
-    const imgs = [];
-    for (const raw of rawImages) {
-      try {
-        imgs.push(await b2u(await toJpeg(d2b(raw))));
-      } catch (_error) {
-        imgs.push(null);
-      }
-    }
-
-    return [{ text: result.value, imgs }];
-  }
-
-  throw new Error('Format non pris en charge : ' + file.name);
-}
-
-const PROMPT = `Tu prépares un document scolaire pour des élèves à besoins spécifiques (ARU). Retranscris FIDÈLEMENT le contenu fourni (image, manuscrit ou HTML), en français, sans reformuler, sans supprimer d'éléments, sans ajouter d'informations non présentes. Respecte la structure du document original et les consignes pédagogiques.
-
-Règles de sortie strictes :
-- Réponds UNIQUEMENT par du JSON : {"blocks":[{"t":"h1|h2|p|ans|tbl|img","x":"texte","n":3}]}
-- h1 = titre, h2 = sous-titre/intitulé de section, p = paragraphe, consigne ou question (garde la numérotation d'origine, ex. "1." ou "a)")
-- Dans "x", entoure de ** les MOTS-CLÉS des consignes (verbes d'action comme Relie, Souligne, Complète, Justifie, Entoure, Calcule, ainsi que les mots décisifs comme "deux", "uniquement", "pas")
-- Ajoute après une question/consigne un bloc {"t":"ans","n":N} quand une réponse est attendue (lignes à compléter, cadre vide, trou à remplir) : N = nombre de lignes de 1 à 8 selon la place disponible
-- Tableau : {"t":"tbl","rows":[["cellule","cellule"],["…","…"]]}, fidèle à la structure d'origine (cellule vide = "", cellule à compléter par l'élève = "") ; mots-clés en **gras** autorisés
-- Image, figure, schéma, dessin, photo (pas le texte) : {"t":"img","box":[x0,y0,x1,y1]} = cadre en fractions de 0 à 1 de l'image fournie (x0,y0 = coin haut-gauche), placé à sa position dans l'ordre du document ; s'il y a un texte ou une légende, le garder dans un bloc p juste avant ou après l’image.
-- Ignore numéros de page et décorations. Pas de markdown autre que **gras**.`;
-
-function renderBlocks(blocks, item = {}) {
-  const ed = $('#ed');
-  const fragment = document.createDocumentFragment();
-
-  for (const block of blocks) {
-    if (!block || typeof block.t !== 'string') continue;
-
-    if (block.t === 'ans') {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'ans';
-      wrapper.contentEditable = 'false';
-      const count = Math.max(1, Math.min(10, Number(block.n) || 2));
-      wrapper.dataset.n = String(count);
-      for (let index = 0; index < count; index += 1) {
-        const line = document.createElement('i');
-        wrapper.appendChild(line);
-      }
-      fragment.appendChild(wrapper);
-      continue;
-    }
-
-    if (block.t === 'tbl' && Array.isArray(block.rows)) {
-      const table = document.createElement('table');
-      for (const row of block.rows) {
-        const tr = document.createElement('tr');
-        const cells = Array.isArray(row) ? row : [row];
-        for (const cell of cells) {
-          const td = document.createElement('td');
-          td.innerHTML = inlineMarkup(String(cell ?? ''));
-          tr.appendChild(td);
+<html lang="fr" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adapt'Text ARU - Adaptation Facile de Documents Accessible</title>
+    
+    <!-- Tailwind CSS pour un design responsive et moderne -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        aru: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
         }
-        table.appendChild(tr);
-      }
-      fragment.appendChild(table);
-      continue;
-    }
+    </script>
+    <!-- FontAwesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Libraries JS pour l'exportation et le traitement des fichiers -->
+    <!-- Utilisation du bundle UMD de docx.js pour éviter 'SyntaxError: Unexpected token export' dans le navigateur -->
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.2.2/build/index.umd.js"></script>
+    <!-- html2pdf.js pour l'export PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- mammoth.js pour lire les fichiers Word importés -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <!-- pdf.js pour la conversion des PDF clients en images -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <!-- heic2any pour convertir les fichiers iPhone / HEIC -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
+    <!-- FileSaver pour faciliter les téléchargements -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
-    if (block.t === 'img') {
-      try {
-        let source = null;
-        if (Array.isArray(item.imgs) && block.ref != null) {
-          source = item.imgs[Number(block.ref)];
+    <style>
+        body {
+            font-family: Arial, sans-serif;
         }
-        if (!source && item.img) {
-          source = await crop(item.img, block.box || [0, 0, 1, 1]);
+
+        /* Styles spécifiques aux normes ARU pour l'éditeur */
+        .aru-content {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 14pt !important;
+            line-height: 1.5 !important;
+            color: #1e293b;
+            word-break: keep-all; /* Interdiction de couper les mots */
+            overflow-wrap: break-word;
         }
-        if (source) {
-          const wrapper = document.createElement('div');
-          wrapper.className = 'fig';
-          wrapper.contentEditable = 'false';
-          const image = document.createElement('img');
-          image.src = typeof source === 'string' ? source : URL.createObjectURL(source);
-          image.alt = '';
-          if (typeof source !== 'string') {
-            image.onload = () => URL.revokeObjectURL(image.src);
-          }
-          wrapper.appendChild(image);
-          fragment.appendChild(wrapper);
+
+        .aru-content p {
+            margin-bottom: 1rem;
+            line-height: 1.5 !important;
+            font-size: 14pt !important;
         }
-      } catch (_error) {
-        // Ignore malformed image blocks.
-      }
-      continue;
-    }
 
-    const tag = block.t === 'h1' ? 'h1' : block.t === 'h2' ? 'h2' : 'p';
-    const node = document.createElement(tag);
-    node.innerHTML = inlineMarkup(block.x ?? '');
-    fragment.appendChild(node);
-  }
-
-  ed.appendChild(fragment);
-}
-
-async function performAnalysis() {
-  if (state.active) return;
-  state.active = true;
-  const goButton = $('#go');
-  const status = $('#st');
-  goButton.disabled = true;
-  $('#ed').innerHTML = '';
-  setStatus('#st', 'Préparation…');
-
-  try {
-    const sample = window.claude ? await window.claude.use('sample') : null;
-    if (!sample && typeof window.ARU_ANALYSE !== 'function') {
-      throw new Error('Analyse indisponible : hors de Claude, définissez window.ARU_ANALYSE.');
-    }
-    if (sample) {
-      const limits = await sample.limits();
-      if (!limits.images) {
-        throw new Error("L'analyse d'images n'est pas disponible pour votre compte.");
-      }
-    }
-
-    let processed = 0;
-    for (const file of state.files) {
-      setStatus('#st', `Préparation de ${file.name}…`);
-      const pieces = await items(file);
-      for (const item of pieces) {
-        processed += 1;
-        setStatus('#st', `Analyse ${processed}…`);
-        const prompt = item.text ? [{ role: 'user', content: PROMPT + '\n\nContenu HTML :\n' + item.text }] : [{ role: 'user', content: PROMPT }];
-        let result;
-        if (sample) {
-          result = await sample.json(prompt, item.img ? { images: [item.img], cache: false } : { cache: false });
-        } else {
-          result = await window.ARU_ANALYSE(prompt[0].content, item);
+        .aru-content h1 {
+            font-size: 20pt !important;
+            font-weight: bold !important;
+            margin-top: 1.5rem !important;
+            margin-bottom: 1rem !important;
+            color: #0c4a6e;
+            border-bottom: 2px solid #bae6fd;
+            padding-bottom: 0.25rem;
         }
-        await renderBlocks(result && Array.isArray(result.blocks) ? result.blocks : [], item);
-      }
-    }
 
-    setStatus('#st', 'Terminé. Relisez et corrigez le texte avant l’export.');
-  } catch (error) {
-    setStatus('#st', 'Erreur : ' + (error.message || error.code || String(error)));
-  } finally {
-    state.active = false;
-    goButton.disabled = !state.files.length;
-  }
-}
-
-$('#go').onclick = performAnalysis;
-
-$('#ed').addEventListener('dblclick', (event) => {
-  const target = event.target.closest('.ans, .fig');
-  if (target) target.remove();
-});
-
-$('#addans').onclick = () => {
-  const ed = $('#ed');
-  const selection = window.getSelection();
-  let anchor = selection && selection.rangeCount ? selection.anchorNode : null;
-  while (anchor && anchor.parentNode && anchor.parentNode !== ed) {
-    anchor = anchor.parentNode;
-  }
-  const wrapper = document.createElement('div');
-  wrapper.className = 'ans';
-  wrapper.contentEditable = 'false';
-  wrapper.dataset.n = '3';
-  for (let index = 0; index < 3; index += 1) {
-    const line = document.createElement('i');
-    wrapper.appendChild(line);
-  }
-  if (anchor && anchor.parentNode === ed) {
-    anchor.after(wrapper);
-  } else {
-    ed.appendChild(wrapper);
-  }
-};
-
-function runsOf(element, bold) {
-  const runs = [];
-  (function walk(node, forceBold) {
-    for (const child of node.childNodes) {
-      if (child.nodeType === 3) {
-        const text = child.textContent || '';
-        if (text.trim()) runs.push({ t: text.replace(/\s+/g, ' '), b: !!forceBold });
-      } else if (child.nodeType === 1) {
-        if (child.tagName === 'B' || child.tagName === 'STRONG') {
-          walk(child, true);
-        } else {
-          walk(child, forceBold);
+        .aru-content h2 {
+            font-size: 17pt !important;
+            font-weight: bold !important;
+            margin-top: 1.25rem !important;
+            margin-bottom: 0.75rem !important;
+            color: #0369a1;
         }
-      }
-    }
-  })(element, bold);
-  return runs;
-}
 
-function model() {
-  const output = [];
-  for (const element of $('#ed').children) {
-    if (element.classList.contains('ans')) {
-      output.push({ k: 'a', n: Number(element.dataset.n) || 2 });
-      continue;
-    }
-    if (element.classList.contains('fig')) {
-      const img = element.querySelector('img');
-      if (img && img.naturalWidth) {
-        output.push({ k: 'i', u: img.src, w: img.naturalWidth, h: img.naturalHeight });
-      }
-      continue;
-    }
-    if (element.tagName === 'TABLE') {
-      output.push({ k: 't', rows: [...element.rows].map((row) => [...row.cells].map((cell) => runsOf(cell, false))) });
-      continue;
-    }
-    const type = element.tagName === 'H1' || element.tagName === 'H2' ? 'h' : 'p';
-    const runs = runsOf(element, type === 'h');
-    if (runs.some((run) => run.t.trim())) output.push({ k: type, runs });
-  }
-  return output;
-}
-
-async function mkDocx(modelData) {
-  const D = window.docx;
-  const paragraphs = [];
-  const font = 'Arial';
-
-  for (const block of modelData) {
-    if (block.k === 't') {
-      const colCount = Math.max(...block.rows.map((row) => row.length));
-      const cellWidth = Math.floor(9638 / colCount);
-      const border = { style: D.BorderStyle.SINGLE, size: 6, color: '444444' };
-      paragraphs.push(new D.Table({
-        width: { size: cellWidth * colCount, type: D.WidthType.DXA },
-        columnWidths: Array(colCount).fill(cellWidth),
-        rows: block.rows.map((row) => new D.TableRow({
-          cantSplit: true,
-          children: row.map((cell) => new D.TableCell({
-            borders: { top: border, bottom: border, left: border, right: border },
-            shading: { fill: 'FFFFFF' },
-            children: cell.map((run) => new D.Paragraph({ children: [new D.TextRun({ text: run.t, bold: run.b, font: font, size: 24 })] }))
-          }))
-        }))
-      }));
-      continue;
-    }
-
-    if (block.k === 'i') {
-      const base64 = block.u.split(',')[1] || '';
-      const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-      paragraphs.push(new D.Paragraph({ keepLines: true, spacing: { after: 160 }, children: [new D.ImageRun({ data: bytes, transformation: { width: 480, height: 320 } })] }));
-      continue;
-    }
-
-    if (block.k === 'a') {
-      for (let index = 0; index < block.n; index += 1) {
-        paragraphs.push(new D.Paragraph({ spacing: { line: 480 }, border: { bottom: { style: D.BorderStyle.SINGLE, size: 6, color: '808080', space: 1 } }, children: [new D.TextRun({ text: '', font: font, size: 24 })] }));
-      }
-      continue;
-    }
-
-    paragraphs.push(new D.Paragraph({
-      keepLines: true,
-      keepNext: block.k === 'h',
-      spacing: { line: 360, before: block.k === 'h' ? 240 : 0, after: 160 },
-      children: block.runs.map((run) => new D.TextRun({ text: run.t, bold: run.b, font: font, size: 28 }))
-    }));
-  }
-
-  const doc = new D.Document({
-    styles: { default: { document: { run: { font: font, size: 28 }, paragraph: { spacing: { line: 360 } } } } },
-    sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } }, children: paragraphs }]
-  });
-  return D.Packer.toBlob(doc);
-}
-
-function mkPdf(modelData) {
-  const doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'a4' });
-  const pageWidth = 595.28;
-  const pageHeight = 841.89;
-  const margin = 56;
-  const lineHeight = 21;
-  const maxWidth = pageWidth - margin * 2;
-  let y = margin;
-
-  const nextLine = (extra = 0) => {
-    if (y + extra > pageHeight - margin) {
-      doc.addPage();
-      y = margin;
-    }
-  };
-
-  const layoutRuns = (runs, widthLimit) => {
-    const lines = [[]];
-    let x = 0;
-    for (const run of runs) {
-      for (const word of run.t.split(/(\s+)/)) {
-        if (!word) continue;
-        const textWidth = doc.getTextWidth(word);
-        if (/^\s+$/.test(word)) {
-          x += textWidth;
-          continue;
+        .aru-content h3 {
+            font-size: 15pt !important;
+            font-weight: bold !important;
+            margin-top: 1rem !important;
+            margin-bottom: 0.5rem !important;
+            color: #0284c7;
         }
-        if (x + textWidth > widthLimit && x > 0) {
-          lines.push([]);
-          x = 0;
-        }
-        lines[lines.length - 1].push({ text: word, bold: run.b, x });
-        x += textWidth;
-      }
-    }
-    return lines;
-  };
 
-  for (const block of modelData) {
-    if (block.k === 'i') {
-      const width = Math.min(maxWidth, 400);
-      const scale = Math.min(1, width / block.w);
-      const imgWidth = block.w * scale;
-      const imgHeight = block.h * scale;
-      nextLine(imgHeight + 20);
-      doc.addImage(block.u, 'JPEG', margin, y, imgWidth, imgHeight);
-      y += imgHeight + 20;
-      continue;
-    }
-
-    if (block.k === 't') {
-      const columnCount = Math.max(...block.rows.map((row) => row.length));
-      const cellWidth = (maxWidth - 10) / columnCount;
-      const cellPadding = 5;
-      for (const row of block.rows) {
-        const rowLines = [];
-        for (let index = 0; index < columnCount; index += 1) {
-          const cell = row[index] || [];
-          rowLines.push(layoutRuns(cell, cellWidth - cellPadding * 2));
+        .aru-content strong {
+            font-weight: 800 !important;
+            color: #000000;
+            background-color: #fef08a; /* Surlignage léger pour la lisibilité */
+            padding: 0 2px;
+            border-radius: 2px;
         }
-        const rowHeight = Math.max(1, ...rowLines.map((lines) => lines.length)) * lineHeight + cellPadding * 2;
-        nextLine(rowHeight + 8);
-        rowLines.forEach((cellLines, index) => {
-          const left = margin + index * cellWidth;
-          doc.rect(left, y, cellWidth, rowHeight);
-          cellLines.forEach((line, lineIndex) => {
-            line.forEach((token) => {
-              doc.setFont('helvetica', token.bold ? 'bold' : 'normal');
-              doc.text(token.text, left + cellPadding + token.x, y + cellPadding + (lineIndex + 1) * lineHeight - 6);
+
+        /* Style des zones de réponses élargies */
+        .aru-answer-space {
+            background-color: #f8fafc;
+            border: 2px dashed #94a3b8;
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin: 1rem 0;
+            min-height: 120px;
+            position: relative;
+        }
+
+        .aru-answer-space::before {
+            content: "✍️ Zone de réponse aérée";
+            font-size: 10pt;
+            color: #64748b;
+            position: absolute;
+            top: 4px;
+            right: 8px;
+            font-style: italic;
+        }
+
+        /* Tableaux adaptés ARU */
+        .aru-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0;
+            font-size: 13pt;
+        }
+
+        .aru-content th, .aru-content td {
+            border: 2px solid #0284c7;
+            padding: 10px 14px;
+            text-align: left;
+        }
+
+        .aru-content th {
+            background-color: #e0f2fe;
+            font-weight: bold;
+        }
+
+        .aru-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 1rem auto;
+            display: block;
+            border: 1px solid #cbd5e1;
+        }
+
+        /* Barre d'outils de l'éditeur */
+        .editor-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            background-color: #f1f5f9;
+            color: #334155;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .editor-btn:hover {
+            background-color: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .editor-btn.active {
+            background-color: #0284c7;
+            color: white;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col min-h-screen text-slate-800 bg-slate-50">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center flex-wrap gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="bg-aru-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
+                    <i class="fa-solid fa-universal-access text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 leading-tight">Adapt'Text <span class="text-aru-600">ARU</span></h1>
+                    <p class="text-xs text-slate-500 font-medium">Adaptation Universelle de Documents (Arial 14 • Interligne 1.5)</p>
+                </div>
+            </div>
+
+            <!-- Boutons d'action rapides et paramètres -->
+            <div class="flex items-center gap-3">
+                <button id="apiKeyBtn" onclick="openApiKeyModal()" class="text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-key"></i> Clé API Gemini
+                </button>
+                <a href="#editor-section" class="text-xs bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-pen-to-square"></i> Accéder à l'éditeur
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Banner d'information ARU -->
+        <div class="bg-gradient-to-r from-aru-900 to-aru-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+            <div class="relative z-10 max-w-3xl">
+                <span class="bg-white/20 text-white text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider inline-block mb-2">Normes d'Accessibilité</span>
+                <h2 class="text-2xl font-bold mb-2">Transformez n'importe quel document en version ARU</h2>
+                <p class="text-slate-100 text-sm leading-relaxed mb-4">
+                    Importez des photos de cours, devoirs manuscrits, PDF, scans ou fichiers Word. L'Intelligence Artificielle retranscrit le texte, applique la typographie <strong>Arial 14pt (Interligne 1.5)</strong>, surligne les consignes et <strong>agrandit les espaces de réponses</strong> trop étroits.
+                </p>
+                <div class="flex flex-wrap gap-4 text-xs font-medium text-slate-200">
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Mots-clés des consignes en gras</span>
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Conservation des tableaux & images</span>
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Support Manuscrits & HEIC</span>
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-emerald-400"></i> Sans coupure de mots</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ZONE D'IMPORTATION / DROPZONE -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-file-import text-aru-600"></i> Step 1 : Importez votre document
+            </h3>
+
+            <div id="dropzone" class="border-2 border-dashed border-slate-300 hover:border-aru-500 bg-slate-50 hover:bg-aru-50/50 rounded-xl p-8 text-center cursor-pointer transition-all duration-200 relative">
+                <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.png,.jpg,.jpeg,.heic,.heif" multiple>
+                
+                <div class="space-y-4">
+                    <div class="w-16 h-16 bg-white shadow-sm rounded-full flex items-center justify-center mx-auto text-aru-600 border border-slate-100">
+                        <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-base font-semibold text-slate-700">Déposez votre document ici ou <span class="text-aru-600 underline">parcourez vos fichiers</span></p>
+                        <p class="text-xs text-slate-500 mt-1">Formats pris en charge : PDF, Word (.docx), Images (PNG, JPG, HEIC, Captures), Notes manuscrites</p>
+                    </div>
+                    <div class="flex flex-wrap justify-center gap-2 pt-2">
+                        <span class="bg-white border border-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-md shadow-2xs">📄 PDF / Word</span>
+                        <span class="bg-white border border-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-md shadow-2xs">🖼️ Captures & Scans</span>
+                        <span class="bg-white border border-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-md shadow-2xs">✍️ Écriture Manuscrite</span>
+                        <span class="bg-white border border-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-md shadow-2xs">📱 Photos iPhone (HEIC)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Liste des fichiers déposés -->
+            <div id="fileListContainer" class="hidden mt-4 space-y-2">
+                <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fichiers sélectionnés :</h4>
+                <div id="fileList" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+            </div>
+
+            <!-- Options de traitement -->
+            <div class="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="optConsignes" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-4 h-4">
+                    <span class="text-slate-700 font-medium">Mettre en gras les verbes des consignes</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="optEspaces" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-4 h-4">
+                    <span class="text-slate-700 font-medium">Agrandir les zones de réponses (lignes courtes)</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="optKeepImages" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-4 h-4">
+                    <span class="text-slate-700 font-medium">Conserver illustrations & schémas</span>
+                </label>
+            </div>
+
+            <!-- Bouton de lancement de conversion -->
+            <div class="mt-6 text-center">
+                <button id="processBtn" onclick="processDocuments()" disabled class="w-full sm:w-auto px-8 py-3.5 bg-aru-600 hover:bg-aru-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 mx-auto">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Transformer en document ARU
+                </button>
+            </div>
+        </section>
+
+        <!-- INDICATEUR DE CHARGEMENT -->
+        <div id="loadingOverlay" class="hidden bg-white border border-aru-200 rounded-2xl p-8 text-center shadow-lg space-y-4">
+            <div class="inline-block animate-spin text-aru-600 text-4xl">
+                <i class="fa-solid fa-circle-notch"></i>
+            </div>
+            <div>
+                <h4 id="loadingStatus" class="text-lg font-bold text-slate-800">Analyse du document par l'IA...</h4>
+                <p id="loadingDetail" class="text-xs text-slate-500 mt-1">Extraction du texte, analyse des consignes et mise en page ARU en cours...</p>
+            </div>
+            <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden max-w-md mx-auto">
+                <div id="progressBar" class="bg-aru-600 h-full w-0 transition-all duration-300"></div>
+            </div>
+        </div>
+
+        <!-- ZONE ÉDITEUR ET PREVIEW WYSIWYG -->
+        <section id="editor-section" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <!-- Header éditeur & Outils -->
+            <div class="bg-slate-100 p-4 border-b border-slate-200 flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="bg-aru-600 text-white text-xs px-2.5 py-1 rounded-md font-bold uppercase">Step 2</span>
+                    <h3 class="text-lg font-bold text-slate-800">Éditeur & Prévisualisation ARU</h3>
+                </div>
+
+                <!-- Boutons de formatage rapides -->
+                <div class="flex flex-wrap items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
+                    <button onclick="formatText('bold')" class="editor-btn text-xs" title="Gras"><i class="fa-solid fa-bold"></i></button>
+                    <button onclick="formatText('italic')" class="editor-btn text-xs" title="Italique"><i class="fa-solid fa-italic"></i></button>
+                    <button onclick="formatText('underline')" class="editor-btn text-xs" title="Souligné"><i class="fa-solid fa-underline"></i></button>
+                    <div class="w-px h-4 bg-slate-200 mx-1"></div>
+                    <button onclick="formatText('insertUnorderedList')" class="editor-btn text-xs" title="Puces"><i class="fa-solid fa-list-ul"></i></button>
+                    <button onclick="formatText('insertOrderedList')" class="editor-btn text-xs" title="Numérotation"><i class="fa-solid fa-list-ol"></i></button>
+                    <div class="w-px h-4 bg-slate-200 mx-1"></div>
+                    <button onclick="insertAnswerBox()" class="editor-btn text-xs text-aru-700 bg-aru-50" title="Ajouter un espace de réponse"><i class="fa-solid fa-square-plus"></i> Espacement réponse</button>
+                </div>
+            </div>
+
+            <!-- Indicateur des paramètres ARU forcés -->
+            <div class="bg-slate-50 px-4 py-2 border-b border-slate-200 text-xs text-slate-600 flex flex-wrap justify-between items-center gap-2">
+                <div class="flex items-center gap-4">
+                    <span><strong>Police :</strong> Arial (Universelle)</span>
+                    <span><strong>Taille :</strong> 14 pt</span>
+                    <span><strong>Interligne :</strong> 1.5</span>
+                    <span><strong>Alignement :</strong> Gauche (sans justification)</span>
+                </div>
+                <div class="text-slate-400 italic">
+                    <i class="fa-solid fa-info-circle"></i> Le texte reste entièrement modifiable avant l'exportation
+                </div>
+            </div>
+
+            <!-- Conteneur éditable WYSIWYG -->
+            <div class="p-6 md:p-10 min-h-[500px] bg-white overflow-y-auto">
+                <div id="aruEditor" contenteditable="true" class="aru-content outline-none focus:ring-1 focus:ring-aru-500 rounded-lg p-4 min-h-[450px]">
+                    <p class="text-slate-400 italic text-center py-16">
+                        Le document transformé apparaîtra ici.<br>
+                        Vous pourrez relire le texte, corriger les éventuelles erreurs et vérifier la mise en page avant l'export.
+                    </p>
+                </div>
+            </div>
+
+            <!-- SECTION EXPORTATION -->
+            <div class="bg-slate-50 p-6 border-t border-slate-200 space-y-4">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                        <h4 class="text-sm font-bold text-slate-800">Step 3 : Choisissez votre format d'exportation</h4>
+                        <p class="text-xs text-slate-500">Sélectionnez les formats souhaités pour télécharger votre document adapté.</p>
+                    </div>
+
+                    <!-- Cases à cocher pour sélection d'export -->
+                    <div class="flex items-center gap-6">
+                        <label class="flex items-center space-x-2 cursor-pointer font-medium text-sm text-slate-700">
+                            <input type="checkbox" id="chkExportDocx" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-5 h-5">
+                            <span><i class="fa-solid fa-file-word text-blue-600"></i> Format Word (.docx)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer font-medium text-sm text-slate-700">
+                            <input type="checkbox" id="chkExportPdf" checked class="rounded border-slate-300 text-aru-600 focus:ring-aru-500 w-5 h-5">
+                            <span><i class="fa-solid fa-file-pdf text-red-600"></i> Format PDF (.pdf)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-3">
+                    <button onclick="clearEditor()" class="px-4 py-2 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition">
+                        <i class="fa-solid fa-trash"></i> Effacer tout
+                    </button>
+                    <button onclick="exportSelectedFormats()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-download"></i> Télécharger les fichiers adaptés
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODAL CLÉ API GEMINI -->
+    <div id="apiKeyModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-key text-amber-500"></i> Clé API Google Gemini
+                </h3>
+                <button onclick="closeApiKeyModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <p class="text-xs text-slate-600 leading-relaxed">
+                L'application utilise l'API Gemini pour réaliser l'OCR des documents manuscrits/scannés et appliquer les règles d'accessibilité ARU.
+            </p>
+
+            <div>
+                <label for="apiKeyInput" class="block text-xs font-semibold text-slate-700 mb-1">Votre clé API Gemini :</label>
+                <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-aru-500 focus:outline-none">
+                <p class="text-[10px] text-slate-400 mt-1">Si vous laissez ce champ vide, la clé d'environnement par défaut sera utilisée.</p>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeApiKeyModal()" class="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Annuler</button>
+                <button onclick="saveApiKey()" class="px-4 py-2 text-xs bg-aru-600 hover:bg-aru-700 text-white font-bold rounded-lg shadow-sm">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // PDF.js worker setup
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        // Variables d'état globales
+        let loadedFiles = [];
+        let customApiKey = localStorage.getItem('GEMINI_API_KEY') || "";
+
+        // Elements DOM
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const fileListContainer = document.getElementById('fileListContainer');
+        const processBtn = document.getElementById('processBtn');
+        const aruEditor = document.getElementById('aruEditor');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingStatus = document.getElementById('loadingStatus');
+        const loadingDetail = document.getElementById('loadingDetail');
+        const progressBar = document.getElementById('progressBar');
+
+        // Initialisation des événements au chargement
+        window.addEventListener('DOMContentLoaded', () => {
+            if (customApiKey) {
+                document.getElementById('apiKeyInput').value = customApiKey;
+            }
+
+            // Gestion du Drag & Drop
+            dropzone.addEventListener('click', () => fileInput.click());
+            
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('border-aru-500', 'bg-aru-50');
             });
-          });
+
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('border-aru-500', 'bg-aru-50');
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('border-aru-500', 'bg-aru-50');
+                if (e.dataTransfer.files.length > 0) {
+                    handleFiles(e.dataTransfer.files);
+                }
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFiles(e.target.files);
+                }
+            });
         });
-        y += rowHeight;
-      }
-      y += lineHeight * 0.6;
-      continue;
-    }
 
-    if (block.k === 'a') {
-      nextLine(lineHeight * 1.6 * block.n);
-      for (let index = 0; index < block.n; index += 1) {
-        y += lineHeight * 1.6;
-        doc.setDrawColor(120);
-        doc.line(margin, y, pageWidth - margin, y);
-      }
-      y += lineHeight * 0.6;
-      continue;
-    }
+        function handleFiles(files) {
+            for (let file of files) {
+                // Éviter les doublons
+                if (!loadedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                    loadedFiles.push(file);
+                }
+            }
+            renderFileList();
+        }
 
-    nextLine(16);
-    if (block.k === 'h') {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      y += 8;
-    } else {
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(12);
-    }
+        function renderFileList() {
+            fileList.innerHTML = '';
+            if (loadedFiles.length === 0) {
+                fileListContainer.classList.add('hidden');
+                processBtn.disabled = true;
+                return;
+            }
 
-    let x = margin;
-    const words = [];
-    for (const run of block.runs) {
-      for (const word of run.t.split(/(\s+)/)) {
-        if (word) words.push({ text: word, bold: run.b });
-      }
-    }
+            fileListContainer.classList.remove('hidden');
+            processBtn.disabled = false;
 
-    for (const token of words) {
-      const textWidth = doc.getTextWidth(token.text);
-      doc.setFont('helvetica', token.bold ? 'bold' : 'normal');
-      if (/^\s+$/.test(token.text)) {
-        if (x > margin) x += textWidth;
-        continue;
-      }
-      if (x + textWidth > pageWidth - margin && x > margin) {
-        x = margin;
-        y += lineHeight;
-        nextLine(0);
-      }
-      doc.text(token.text, x, y);
-      x += textWidth;
-    }
-    y += block.k === 'h' ? 10 : lineHeight * 0.4;
-  }
+            loadedFiles.forEach((file, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between bg-white p-2.5 rounded-lg border border-slate-200 text-xs';
+                
+                let iconClass = 'fa-file-lines text-slate-500';
+                if (file.name.endsWith('.pdf')) iconClass = 'fa-file-pdf text-red-500';
+                else if (file.name.endsWith('.docx')) iconClass = 'fa-file-word text-blue-500';
+                else if (file.type.startsWith('image/')) iconClass = 'fa-file-image text-emerald-500';
 
-  return doc.output('blob');
-}
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <i class="fa-solid ${iconClass} text-base"></i>
+                        <span class="font-medium text-slate-700 truncate max-w-xs">${file.name}</span>
+                        <span class="text-[10px] text-slate-400">(${Math.round(file.size / 1024)} KB)</span>
+                    </div>
+                    <button onclick="removeFile(${index})" class="text-slate-400 hover:text-red-500 p-1">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+                fileList.appendChild(item);
+            });
+        }
 
-async function saveBlob(filename, blob) {
-  const downloads = window.claude ? await window.claude.use('downloads') : null;
-  if (downloads && typeof downloads.save === 'function') {
-    await downloads.save({ filename, data: blob });
-    return;
-  }
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+        function removeFile(index) {
+            loadedFiles.splice(index, 1);
+            renderFileList();
+        }
 
-$('#exp').onclick = async () => {
-  const status = $('#st2');
-  const modelData = model();
-  if (!modelData.length) {
-    setStatus('#st2', 'Rien à exporter.');
-    return;
-  }
-  if (!$('#xd').checked && !$('#xp').checked) {
-    setStatus('#st2', 'Cochez au moins un format.');
-    return;
-  }
+        async function processDocuments() {
+            if (loadedFiles.length === 0) return;
 
-  try {
-    if ($('#xd').checked) {
-      await saveBlob('document-ARU.docx', await mkDocx(modelData));
-    }
-    if ($('#xp').checked) {
-      await saveBlob('document-ARU.pdf', mkPdf(modelData));
-    }
-    setStatus('#st2', 'Export demandé.');
-  } catch (error) {
-    setStatus('#st2', 'Erreur : ' + (error.message || error.code || String(error)));
-  }
-};
+            // Affichage du loader
+            loadingOverlay.classList.remove('hidden');
+            processBtn.disabled = true;
+            updateProgress(10, "Préparation des fichiers...", "Conversion des images et extraction du contenu...");
 
-updateFileList();
-</script></body></html>
+            let combinedHtml = "";
+
+            try {
+                for (let i = 0; i < loadedFiles.length; i++) {
+                    const file = loadedFiles[i];
+                    const progressVal = 10 + Math.round(((i + 1) / loadedFiles.length) * 80);
+                    updateProgress(progressVal, `Traitement de ${file.name}...`, "Analyse de la structure et adaptation ARU...");
+
+                    let resultHtml = "";
+
+                    if (file.name.toLowerCase().endsWith('.docx')) {
+                        resultHtml = await processDocxFile(file);
+                    } else if (file.name.toLowerCase().endsWith('.pdf')) {
+                        resultHtml = await processPdfFile(file);
+                    } else {
+                        // Traitement image (JPG, PNG, HEIC, manuscrit)
+                        resultHtml = await processImageFile(file);
+                    }
+
+                    combinedHtml += resultHtml + "<br><hr class='my-6 border-slate-200'><br>";
+                }
+
+                // Insertion dans l'éditeur
+                aruEditor.innerHTML = combinedHtml;
+
+                updateProgress(100, "Terminé !", "Document adapté aux normes ARU prêt pour révision.");
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                    document.getElementById('editor-section').scrollIntoView({ behavior: 'smooth' });
+                }, 800);
+
+            } catch (error) {
+                console.error("Erreur de traitement :", error);
+                alert("Une erreur s'est produite lors du traitement du document : " + error.message);
+                loadingOverlay.classList.add('hidden');
+                processBtn.disabled = false;
+            }
+        }
+
+        function updateProgress(percent, status, detail) {
+            progressBar.style.width = percent + "%";
+            loadingStatus.textContent = status;
+            loadingDetail.textContent = detail;
+        }
+
+        /* TRAITEMENT DES DIFFERENTS TYPES DE FICHIERS */
+
+        // 1. Traitement Fichier Word .docx
+        async function processDocxFile(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+            let html = result.value;
+
+            // Transmettre le HTML à Gemini pour nettoyage ARU
+            return await adaptHtmlWithGemini(html);
+        }
+
+        // 2. Traitement Fichier PDF (Converti en images puis envoyé à Gemini)
+        async function processPdfFile(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullPdfHtml = "";
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                updateProgress(
+                    20 + Math.round((pageNum / pdf.numPages) * 60), 
+                    `Analyse PDF - Page ${pageNum}/${pdf.numPages}...`, 
+                    "Extraction de la page pour OCR"
+                );
+
+                const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                const base64Image = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+
+                const pageHtml = await callGeminiVision(base64Image, 'image/jpeg');
+                fullPdfHtml += pageHtml;
+            }
+
+            return fullPdfHtml;
+        }
+
+        // 3. Traitement Image / HEIC / Manuscrit
+        async function processImageFile(file) {
+            let blob = file;
+            let mimeType = file.type;
+
+            // Support HEIC / HEIF
+            if (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')) {
+                updateProgress(20, "Conversion du format HEIC...", "Adaptation de la photo iPhone...");
+                try {
+                    const convertedBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.8 });
+                    blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+                    mimeType = "image/jpeg";
+                } catch (e) {
+                    console.warn("Échec heic2any, tentative directe avec le fichier raw...", e);
+                }
+            }
+
+            const base64Data = await blobToBase64(blob);
+            return await callGeminiVision(base64Data, mimeType || 'image/jpeg');
+        }
+
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64String = reader.result.split(',')[1];
+                    resolve(base64String);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        async function callGeminiVision(base64Image, mimeType) {
+            const apiKey = customApiKey || "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const optConsignes = document.getElementById('optConsignes').checked;
+            const optEspaces = document.getElementById('optEspaces').checked;
+            const optKeepImages = document.getElementById('optKeepImages').checked;
+
+            const promptSystem = `
+            Tu es un expert reconnu en orthopédagogie et en Aménagements Raisonnables Universels (ARU) pour les élèves dyslexiques, dyspraxiques et ayant des troubles des apprentissages.
+            Ta mission est d'effectuer un OCR haute précision de ce document (manuscrit ou imprimé) et d'en retourner le contenu sous forme de code HTML strictement structuré.
+
+            Consignes impératives pour les normes ARU :
+            1. **Consignes et Verbes d'action** : ${optConsignes ? 'Mets IMPÉRATIVEMENT en GRAS (balise <strong>) tous les mots-clés et verbes d\'action des consignes (ex: <strong>Surligne</strong>, <strong>Calcule</strong>, <strong>Trouve</strong>, <strong>Entoure</strong>, <strong>Explique</strong>, <strong>Justifie</strong>, <strong>Coche</strong>, <strong>Lis</strong>, etc.).' : ''}
+            2. **Structure du document** : Organise clairement avec des titres <h1>, <h2>, <h3>. Tous les titres doivent être mis en évidence en <strong>gras</strong>.
+            3. **Espacement des réponses ("lignes trop petites")** : ${optEspaces ? 'Dès qu\'il y a une question ou un exercice où l\'élève doit répondre (mots à trous, lignes de réponse trop petites), crée une zone de réponse aérée en insérant la balise HTML suivante : `<div class="aru-answer-space"></div>` avec suffisamment d\'espace vertical.' : ''}
+            4. **Respect absolu du texte** : Conserve scrupuleusement la langue, le sens des mots. INTERDICTION ABSOLUE de couper les mots inutilement en fin de ligne (mots entiers requis).
+            5. **Tableaux et Illustrations** : ${optKeepImages ? 'Conserve les tableaux sous forme de balises HTML <table> avec des bordures bien nettes. Si des illustrations sont présentes, décris-les brièvement ou conserve les emplacements.' : ''}
+            6. **Format de sortie** : Fournis UNIQUEMENT du code HTML valide (pas de bloc de code markdown \`\`\`html, juste le fragment HTML interne).
+            `;
+
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: promptSystem },
+                            {
+                                inlineData: {
+                                    mimeType: mimeType || "image/jpeg",
+                                    data: base64Image
+                                }
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erreur API Gemini (${response.status}) : Vérifiez votre clé API ou le format du fichier.`);
+            }
+
+            const result = await response.json();
+            let htmlText = result.candidates?.[0]?.content?.parts?.[0]?.text || "<p>Erreur lors de la lecture du document.</p>";
+            
+            // Nettoyage des balises markdown si présentes
+            htmlText = htmlText.replace(/```html/g, '').replace(/```/g, '').trim();
+            return htmlText;
+        }
+
+        async function adaptHtmlWithGemini(rawHtml) {
+            const apiKey = customApiKey || "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const promptSystem = `
+            Transforme ce document HTML selon les règles des Aménagements Raisonnables Universels (ARU) :
+            1. Mets en GRAS (balise <strong>) les mots-clés des consignes (Lis, Entoure, Souligne, Calcule, Justifie...).
+            2. Structure le texte avec des titres <h1>, <h2> mis en gras.
+            3. Si des espaces de réponse sont trop étroits, remplace-les par <div class="aru-answer-space"></div>.
+            4. Ne coupe aucun mot.
+            5. Renvoie UNIQUEMENT le code HTML nettoyé.
+            `;
+
+            const payload = {
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: promptSystem + "\n\nHTML source:\n" + rawHtml }
+                    ]
+                }]
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) return rawHtml; // Fallback en cas d'erreur
+            const result = await response.json();
+            let htmlText = result.candidates?.[0]?.content?.parts?.[0]?.text || rawHtml;
+            return htmlText.replace(/```html/g, '').replace(/```/g, '').trim();
+        }
+
+        function formatText(command) {
+            document.execCommand(command, false, null);
+        }
+
+        // Export DOCX via docx.js (avec fallback Word HTML)
+        async function exportToDocx(htmlContent) {
+            try {
+                // Vérification si la librairie docx UMD est chargée dans window.docx
+                const docxLib = window.docx;
+
+                if (docxLib && docxLib.Document && docxLib.Packer) {
+                    const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docxLib;
+
+                    // Extraction du DOM pour la conversion docx.js
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = htmlContent;
+
+                    const docChildren = [];
+
+                    function processNode(node) {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            const text = node.textContent;
+                            if (text.trim()) {
+                                return new TextRun({ text: text, font: "Arial", size: 28 }); // 28 half-points = 14pt
+                            }
+                        } else if (node.nodeType === Node.ELEMENT_NODE) {
+                            const tagName = node.tagName.toLowerCase();
+
+                            if (tagName === 'h1') {
+                                docChildren.push(new Paragraph({
+                                    heading: HeadingLevel.HEADING_1,
+                                    spacing: { before: 300, after: 200, line: 360 },
+                                    children: [new TextRun({ text: node.textContent, bold: true, font: "Arial", size: 40, color: "0C4A6E" })]
+                                }));
+                            } else if (tagName === 'h2') {
+                                docChildren.push(new Paragraph({
+                                    heading: HeadingLevel.HEADING_2,
+                                    spacing: { before: 240, after: 150, line: 360 },
+                                    children: [new TextRun({ text: node.textContent, bold: true, font: "Arial", size: 34, color: "0369A1" })]
+                                }));
+                            } else if (tagName === 'div' && node.classList.contains('aru-answer-space')) {
+                                for (let i = 0; i < 4; i++) {
+                                    docChildren.push(new Paragraph({
+                                        spacing: { before: 120, after: 120 },
+                                        border: { bottom: { color: "94A3B8", space: 1, value: "single", size: 6 } },
+                                        children: [new TextRun({ text: "", font: "Arial", size: 28 })]
+                                    }));
+                                }
+                            } else if (tagName === 'p' || tagName === 'li') {
+                                const runs = [];
+                                node.childNodes.forEach(child => {
+                                    const isBold = child.nodeName === 'STRONG' || child.nodeName === 'B';
+                                    runs.push(new TextRun({
+                                        text: child.textContent,
+                                        bold: isBold,
+                                        font: "Arial",
+                                        size: 28
+                                    }));
+                                });
+                                docChildren.push(new Paragraph({
+                                    spacing: { after: 200, line: 360 },
+                                    children: runs
+                                }));
+                            } else {
+                                node.childNodes.forEach(processNode);
+                            }
+                        }
+                    }
+
+                    tempDiv.childNodes.forEach(processNode);
+
+                    const doc = new Document({
+                        sections: [{
+                            properties: {
+                                page: {
+                                    margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+                                }
+                            },
+                            children: docChildren.length > 0 ? docChildren : [
+                                new Paragraph({
+                                    children: [new TextRun({ text: tempDiv.textContent || "", font: "Arial", size: 28 })]
+                                })
+                            ]
+                        }]
+                    });
+
+                    const blob = await Packer.toBlob(doc);
+                    saveAs(blob, "Document_Adapte_ARU.docx");
+                } else {
+                    // Fallback vers export HTML-DOCX pour compatibilité maximale Word avec styles ARU
+                    exportToWordHtml(htmlContent);
+                }
+
+            } catch (err) {
+                console.warn("Utilisation du fallback d'export Word :", err);
+                exportToWordHtml(htmlContent);
+            }
+        }
+
+        function exportToWordHtml(htmlContent) {
+            const wordHeader = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head><meta charset='utf-8'><title>Document ARU</title>
+            <style>
+                body { font-family: Arial, sans-serif !important; font-size: 14pt !important; line-height: 1.5 !important; color: #1e293b; }
+                h1 { font-size: 20pt !important; font-weight: bold !important; color: #0c4a6e; }
+                h2 { font-size: 17pt !important; font-weight: bold !important; color: #0369a1; }
+                h3 { font-size: 15pt !important; font-weight: bold !important; color: #0284c7; }
+                strong { font-weight: bold !important; background-color: #fef08a; }
+                .aru-answer-space { border: 2px dashed #94a3b8; padding: 20px; margin: 15px 0; min-height: 100px; background-color: #f8fafc; }
+                table { border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 13pt; }
+                th, td { border: 2px solid #0284c7; padding: 10px; text-align: left; }
+                th { background-color: #e0f2fe; font-weight: bold; }
+            </style>
+            </head><body>`;
+            const wordFooter = "</body></html>";
+            const fullContent = wordHeader + htmlContent + wordFooter;
+
+            const blob = new Blob(['\ufeff', fullContent], {
+                type: 'application/msword'
+            });
+            saveAs(blob, "Document_Adapte_ARU.doc");
+        }
+
+        // Export PDF via html2pdf.js
+        async function exportToPdf() {
+            const element = aruEditor;
+            const opt = {
+                margin:       [15, 15, 15, 15],
+                filename:     'Document_Adapte_ARU.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            await html2pdf().set(opt).from(element).save();
+        }
+
+        /* MODAL GESTION CLE API */
+        function openApiKeyModal() {
+            document.getElementById('apiKeyModal').classList.remove('hidden');
+        }
+
+        function closeApiKeyModal() {
+            document.getElementById('apiKeyModal').classList.add('hidden');
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            customApiKey = key;
+            localStorage.setItem('GEMINI_API_KEY', key);
+            closeApiKeyModal();
+            alert("Clé API Gemini enregistrée !");
+        }
+    </script>
+</body>
+</html>
