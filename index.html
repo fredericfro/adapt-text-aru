@@ -954,7 +954,10 @@
                         if (node.nodeType === Node.TEXT_NODE) {
                             const text = node.textContent;
                             if (text.trim()) {
-                                return new TextRun({ text: text, font: "Arial", size: 28 });
+                                docChildren.push(new Paragraph({
+                                    spacing: { after: 120, line: 360 },
+                                    children: [new TextRun({ text: text, font: "Arial", size: 28 })]
+                                }));
                             }
                         } else if (node.nodeType === Node.ELEMENT_NODE) {
                             const tagName = node.tagName.toLowerCase();
@@ -992,7 +995,7 @@
                                 });
                                 docChildren.push(new Paragraph({
                                     spacing: { after: 200, line: 360 },
-                                    children: runs
+                                    children: runs.length > 0 ? runs : [new TextRun({ text: node.textContent, font: "Arial", size: 28 })]
                                 }));
                             } else {
                                 node.childNodes.forEach(processNode);
@@ -1010,6 +1013,34 @@
                                 }
                             },
                             children: docChildren.length > 0 ? docChildren : [
+                                new Paragraph({
+                                    children: [new TextRun({ text: "Document Adapté ARU", font: "Arial", size: 28 })]
+                                })
+                            ]
+                        }]
+                    });
+
+                    const blob = await Packer.toBlob(doc);
+                    saveAs(blob, "Document_Adapte_ARU.docx");
+                    showToast("Fichier Word (.docx) généré avec succès.", "success");
+                    return;
+                }
+            } catch (err) {
+                console.warn("Échec docx.js, tentative export Word HTML :", err);
+            }
+
+            exportToWordHtml(htmlContent);
+        }
+
+        function exportToWordHtml(htmlContent) {
+            const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Document ARU</title><style>body { font-family: Arial, sans-serif; font-size: 14pt; line-height: 1.5; color: #1e293b; } .aru-answer-space { border: 2px dashed #94a3b8; height: 100px; margin: 15px 0; } h1 { font-size: 20pt; font-weight: bold; color: #0c4a6e; } h2 { font-size: 17pt; font-weight: bold; color: #0369a1; } h3 { font-size: 15pt; font-weight: bold; color: #0284c7; } strong { font-weight: bold; background-color: #fef08a; }</style></head><body>";
+            const footer = "</body></html>";
+            const sourceHTML = header + htmlContent + footer;
+            const blob = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
+            saveAs(blob, "Document_Adapte_ARU.docx");
+            showToast("Fichier Word généré en mode secours HTML.", "info");
+        }
+
         // Export PDF via html2pdf.js avec fallback natif
         async function exportToPdf() {
             const htmlContent = aruEditor.innerHTML;
